@@ -1,5 +1,14 @@
 # Plan — collinson-issue-tracker
 
+> **This is a concept document.** It describes what the system is, what gets measured, what was cut,
+> and which assumptions were taken. It is deliberately not executable and should not be read as a
+> build instruction — "implement PLAN.md" would leave an implementer inventing dozens of decisions
+> this document does not make.
+>
+> The executable layer lives in `specs/`: one specification per work-order step below, each with
+> acceptance checks, committed before the code that satisfies it. See `specs/README.md` for the
+> template and `CLAUDE.md` for the method.
+
 ## What this is
 
 ArgoCD for issue handling. A framework of generic primitives, plus a repo-specific adapter that
@@ -124,17 +133,34 @@ the question and the assumption you went with."_
 
 ## Work order
 
-1. Framework primitives 1, 2, 5 (meter, state, classifier) + `AnthropicLlm` + the cost smoke test.
-   Nothing downstream is trustworthy until the token accounting is verified.
-2. ADR-0001 (framework/adapter split, why the adapter is the deliverable), ADR-0002 (structured
-   output: SDK-native vs the ported schema serializer).
-3. The primary adapter's policy documents. This is the rubric, so it comes before the dataset.
-4. Dataset construction against those policies + the agreement check.
-5. The harness: fixtures → pipeline → per-field metrics → cost. Single measurement, reported well.
-6. Primitives 3, 4, 6 (observer, policy resolver, gate) + the uroboros adapter.
-7. Configuration sweep → the cost/quality frontier table.
-8. README: what was built, how to run it, what the evaluation showed, the assumptions above, and
-   what was cut and why.
+Each step below becomes one specification in `specs/`, written just before it is built — not all at
+once. The spec carries what this document deliberately does not: acceptance checks, file-level
+detail, and the decisions that were still open when this was written.
+
+| #   | Step                                                                                     | Notes                                                                                                                                        |
+| --- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Meter, state, classifier primitives + `AnthropicLlm` + cost smoke test                   | Nothing downstream is trustworthy until token accounting is verified. Independent of every open question below, so it can start immediately. |
+| 2   | ADR on structured output: SDK-native `output_config.format` vs the ported `schemaToSpec` | Deciding _not_ to port a home-grown serializer is a result worth recording.                                                                  |
+| 3   | The primary adapter's policy documents                                                   | These are the labelling rubric, so they precede the dataset. Blocked on the target-repo question.                                            |
+| 4   | Dataset construction + the agreement check                                               | Blocked on who labels. An LLM-labelled set scored by an LLM is a much weaker claim and must be disclosed, not discovered.                    |
+| 5   | The harness: fixtures → pipeline → per-field metrics → cost                              | One measurement, reported well.                                                                                                              |
+| 6   | Observer, policy resolver, gate primitives + the uroboros adapter                        | First to cut.                                                                                                                                |
+| 7   | Configuration sweep → cost/quality frontier table                                        | Second to cut.                                                                                                                               |
+| 8   | README completion: how to run it, what the evaluation showed                             |                                                                                                                                              |
 
 Steps 6 and 7 are the ones to drop if time runs short. A note explaining the cut is worth more to
 the reader than a rushed version of either.
+
+### What this plan does not deliver
+
+Stated plainly because the architecture section above describes a system that sounds deployable:
+
+- **No Docker image and no runtime.** The deliverable is a CLI run with `tsx`, per the brief's
+  "a CLI or plain test output is enough".
+- **No MCP servers.** The GitHub surface is one port with a fake and a real implementation.
+- **No autonomous fix-and-publish.** The delivery stage emits a plan, never a pull request. See
+  ADR-0002.
+
+If the system should instead be demonstrable as a running service, that is a different plan and a
+materially larger build — it would compete directly with the harness for time, against a brief that
+warns about volume four separate times.

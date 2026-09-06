@@ -23,10 +23,21 @@ confidence in an LLM system by **measuring its output**, not by supervising its 
 that to the service while hand-holding the agent that builds it would be incoherent — and it would
 put me, the slowest component, in the critical path of every change.
 
-So the agents write the code. What is written down instead is the part that supervision was standing
-in for: the design and the decisions, in `PLAN.md`, `docs/adr/` and `notes/`, and the harness that
-says whether the result is any good. Where the design was underspecified, the assumption taken is
-recorded rather than quietly chosen. That trail, not the diff, is what I would want read.
+What replaces the leash is **spec-driven development**. Each unit of work gets a written
+specification in `specs/` — goal, done-when, an acceptance check that can be run, the decisions
+already made, the assumptions taken, and what it must explicitly not do. The spec is committed
+first, on its own; the implementation follows in a later commit; and when the spec turns out to be
+wrong, it is amended in its own commit with the reason.
+
+That ordering is deliberate, and it is why this method suits the exercise rather than sitting beside
+it. The brief asks to follow the reasoning and see the decisions, not to read a polished write-up.
+A sequence of specs, implementations, and visible amendments _is_ that record, with timestamps I did
+not have to curate. The amendments are the honest part: a spec that was never revised is a spec
+written after the fact.
+
+So the layers are: `PLAN.md` is the concept — architecture, what gets measured, what was cut, and
+why. `specs/` is the executable layer. `docs/adr/` holds the decisions that outlive a single step.
+`notes/` is the working record. The trail, not the diff, is what I would want read.
 
 **I bootstrapped it from my own framework.** The LLM port, the metering, the append-only chronicle
 and the agent suite are lifted from a personal project of mine and adapted. That project already
@@ -135,9 +146,17 @@ typecheck, lint and format are green. **There are no tests yet**, so treat `pnpm
 syntax-and-style gate rather than evidence of behaviour. The service, the harness and the dataset
 are the work in progress.
 
-Planned order, and the reasoning for it, is in `PLAN.md`. The first step is deliberately unglamorous:
-verify that token accounting is correct. Every number this project reports comes out of the meter, so
-an unverified meter would silently invalidate the adapter work — which is the actual deliverable.
+Planned order, and the reasoning for it, is in `PLAN.md`; each step becomes a spec in `specs/` as it
+is reached. The first is deliberately unglamorous: verify that token accounting is correct. Every
+number this project reports comes out of the meter, so an unverified meter would silently invalidate
+the adapter work — which is the actual deliverable.
+
+`PLAN.md` describes a system that sounds deployable, so to be unambiguous about what this repository
+will and will not contain: there is **no Docker image or hosted runtime** (the deliverable is a CLI,
+which is what the brief asks for), **no MCP servers**, and **no autonomous fix-and-publish** — the
+delivery stage emits a plan, never a pull request. Making it a running service is a different and
+materially larger build, and it would compete with the harness for the time this exercise says to
+spend on the harness.
 
 Sections to be completed before submission: **how to run it**, and **what the eval showed**. They are
 empty because the runs have not happened, not as an oversight.
