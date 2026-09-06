@@ -18,12 +18,6 @@ something to measure. A harness that measures one thing well beats one that meas
 Quality is not the only axis. A change that is more accurate but three times the price is a real
 trade-off and must be visible in the numbers the harness reports.
 
-## Language
-
-English, everywhere and without exception. Conversation with the operator, thinking, notes,
-questions, code, comments, documentation, commit messages, README. Nothing in this repository
-or in any session working on it is written in another language.
-
 ---
 
 ## How we work — spec-driven
