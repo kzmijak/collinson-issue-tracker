@@ -24,13 +24,20 @@ open pull requests.
 
 ## Reasoning
 
-Two arguments, and the second is the stronger one.
+An agent that reliably fixes arbitrary issues is a harder product than the one being built, and the
+harness measures none of it. Every hour spent there is an hour not spent on the part the exercise
+ranks first.
 
-First, scope: an agent that reliably fixes arbitrary issues is a harder product than the one being
-built, and the harness measures none of it.
+There is also an evaluation argument. A plan is a _comparable artifact_: two configurations produce
+two plans for the same issue, and they can be scored against each other and against actual spend. A
+merged pull request is not comparable in the same way — its quality is confounded with the repository
+it landed in, and a failed one leaves state behind. Scoring the plan isolates the decision, which is
+what this project is measuring.
 
-Second, consistency: this repository runs under a Code Production Protocol (`CLAUDE.md`) stating that
-code is never produced proactively — it is the artifact of a design agreed first, emitted for review,
-and transcribed only on explicit instruction. A bot that silently opens pull requests is precisely
-what that document forbids. Shipping both would mean the project does not believe its own governing
-rule.
+## Note
+
+An earlier revision of this decision leaned on a second argument: that the repository ran under a
+protocol forbidding agents from producing code unsupervised, so an autonomous pull-request bot would
+be self-contradictory. That protocol was dropped — supervising the agent by hand contradicts the
+premise that confidence comes from measurement rather than oversight. The decision stands on the
+scope and comparability arguments alone.

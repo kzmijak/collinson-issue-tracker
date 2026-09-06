@@ -14,23 +14,19 @@ consequences worth stating plainly rather than leaving for you to infer:
 
 **I leaned on AI heavily for the implementation.** That is not an apology — for this role it is
 arguably the thing worth demonstrating — but it does change what the code proves. Generated code is
-evidence of a working process, not of craftsmanship. So the process is written down and enforced
-rather than left implicit. `CLAUDE.md` in this repository contains a **Code Production Protocol**
-that governs it:
+evidence of a working process, not of craftsmanship.
 
-- Code is never produced proactively or as a draft. It is the final artifact of a design worked out
-  in conversation first — behaviour, structure, rules, and explicit non-scope agreed before
-  anything is emitted.
-- Two gates. **Before** emitting: if working code would require anything not in the plan, that is
-  raised as a question, not filled in with a sensible default. **During** generation: if a gap
-  surfaces, the partial artifact is discarded and never shown — only the gap and the options are
-  reported.
-- The rule is enforced by the harness, not by discipline. `permissions.deny` plus a `PreToolUse`
-  hook (`.claude/hooks/guard-bash.mjs`) make `src/`, `tests/` and `fixtures/` unwritable from a tool
-  call, including through shell heredocs, which is where that kind of rule usually leaks.
+The tempting response is to put a leash on it: gate every file behind a design conversation, require
+manual sign-off before anything is written. I tried that, and then removed it, because it
+contradicts the premise of the project. This whole exercise is an argument that you establish
+confidence in an LLM system by **measuring its output**, not by supervising its every step. Applying
+that to the service while hand-holding the agent that builds it would be incoherent — and it would
+put me, the slowest component, in the critical path of every change.
 
-The intended effect is that the design conversation, not the generated code, is the primary record —
-which happens to be what the exercise asks to see.
+So the agents write the code. What is written down instead is the part that supervision was standing
+in for: the design and the decisions, in `PLAN.md`, `docs/adr/` and `notes/`, and the harness that
+says whether the result is any good. Where the design was underspecified, the assumption taken is
+recorded rather than quietly chosen. That trail, not the diff, is what I would want read.
 
 **I bootstrapped it from my own framework.** The LLM port, the metering, the append-only chronicle
 and the agent suite are lifted from a personal project of mine and adapted. That project already
@@ -175,5 +171,6 @@ posted, and a real one that posts — so the approval flow exists as a tested st
 any webhook infrastructure behind it.
 
 The delivery stage produces a **fix plan and a cost estimate, not executed code**. Nothing in the
-harness scores generated code, and an agent that autonomously opens pull requests would contradict
-the Code Production Protocol this repository runs under.
+harness scores a merged pull request, and a plan is a _comparable_ artifact in a way a merge is not:
+two configurations produce two plans for the same issue, and those can be scored against each other
+and against actual spend. See ADR-0002.

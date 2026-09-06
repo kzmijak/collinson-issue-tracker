@@ -15,5 +15,3 @@ paths:
   parsing, metering and policy layers under test. Mocking the whole pipeline tests nothing.
 - Quality focus: fast tests > catching real problems > coverage.
 - False confidence is worse than no tests. A green suite with unfalsifiable assertions is a FAIL.
-
-Test code is code. It goes through the Code Production Protocol in `CLAUDE.md` like anything else.

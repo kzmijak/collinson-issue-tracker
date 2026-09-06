@@ -18,15 +18,15 @@
       "Write(notes/**)",
       "Edit(notes/**)",
       "Write(adapters/**)",
-      "Edit(adapters/**)"
-    ],
-    "deny": [
+      "Edit(adapters/**)",
       "Write(src/**)",
       "Edit(src/**)",
       "Write(tests/**)",
       "Edit(tests/**)",
       "Write(fixtures/**)",
-      "Edit(fixtures/**)"
+      "Edit(fixtures/**)",
+      "Write(README.md)",
+      "Edit(README.md)"
     ]
   },
   "hooks": {

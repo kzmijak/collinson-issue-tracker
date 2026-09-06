@@ -26,8 +26,8 @@ Six primitives. Each one exists in the framework as a seam, and is configured by
 
 Delivery is the seventh stage but not a seventh primitive — it is a classifier variant whose
 output is a **fix plan plus cost estimate**, not executed code. Two reasons: nothing in the harness
-scores generated code, and an agent that autonomously opens PRs contradicts the Code Production
-Protocol in `CLAUDE.md`.
+scores a merged PR, and a plan is comparable in a way a merge is not — two configurations produce
+two plans for the same issue, scoreable against each other and against actual spend. See ADR-0002.
 
 ## Framework vs adapter
 

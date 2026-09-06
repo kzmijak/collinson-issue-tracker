@@ -26,108 +26,31 @@ or in any session working on it is written in another language.
 
 ---
 
-## Code Production Protocol
+## How we work
 
-**This is the governing rule of this repository. It overrides default assistant behaviour.**
+Agents implement. You are not carrying anyone by the hand, and nothing here gates writing code
+behind a hand-approval step. Confidence in what gets built comes from the harness measuring it, not
+from supervision — hand-gating the agent would contradict the premise of the project itself.
 
-Code is never produced proactively, speculatively, or as a draft. Code is an **artifact**: the
-final output of a design that was worked out jointly, in conversation, before a single line
-existed. It is not a scratchpad, not a starting point for discussion, and not a way to find out
-what the design should be.
+Three things still hold, because they are cheap and they are what the deliverable is made of:
 
-The default state is: **no code is written.** Producing code requires having passed the gates below.
+**Plan before non-trivial work.** For anything beyond a small, local change, say what you are about
+to build and why before building it. Not for approval — for the record. A one-paragraph note in
+`notes/` costs nothing and is ranked above the code by the people reading this repository.
 
-### What counts as code
+**Surface gaps, do not invent through them.** If the design is underspecified and finishing would
+mean inventing a behaviour nobody decided — an error path, a threshold, a policy default — say so
+and pick a default explicitly, in writing. Silently choosing is the failure; choosing and recording
+the choice is fine. The brief asks for exactly this: the open question, and the assumption you went
+with.
 
-Implementation source, tests, fixtures, schemas, configuration with behaviour in it, shell
-scripts. If it executes or is consumed by something that executes, it is code and this protocol
-applies to it.
+**Keep the trail.** Notes in `notes/`, decisions in `docs/adr/`, atomic commits. This is deliverable
+#1 and it is worth more than the code it describes. Write the note when the thinking happens, not
+reconstructed afterwards.
 
-Prose does not: notes, decision records, question lists, plans, README text, tables of results.
-Those are the reasoning trail and are written freely.
-
-### Phase 1 — Design, together
-
-Before anything is emitted, the operator and the assistant work out, in dialogue:
-
-- what the thing must do, stated as behaviour and not as implementation;
-- its structure — the pieces, their responsibilities, the boundaries between them;
-- its rules — the invariants, the edge cases, what happens when input is wrong;
-- what is explicitly **out of scope**.
-
-The assistant contributes by asking, proposing, and challenging — not by writing code to
-illustrate a point. A code sample is not a legitimate move in a design conversation here.
-If an idea needs a shape to be discussed, describe the shape in words, a signature, or a table.
-
-Open questions that would normally go to a stakeholder get written down alongside the assumption
-chosen, in the notes. They are never resolved silently.
-
-### Phase 2 — Pre-flight completeness gate
-
-**Before emitting anything**, enumerate what the agreed design actually covers, and check it
-against what working code would require.
-
-If producing functioning code would require any element that was not agreed — an error path, a
-dependency, a helper, a config value, a decision about behaviour nobody made — **stop and raise
-it as a question**. Do not fill it in. Do not pick a sensible default. Do not add it because the
-code is meaningless without it.
-
-An incomplete plan is a defect in the planning, not a licence to improvise. Finding the gap here,
-before generation, is the cheap outcome and the desired one.
-
-### Phase 3 — Emission
-
-Once the gate passes, the code is produced **in chat**, in a fenced block. Not written to a file.
-
-It contains **exactly what was agreed and nothing else**:
-
-- no convenience helpers nobody asked for,
-- no defensive branches that were not specified,
-- no logging, no configuration hooks, no extension points added "for later",
-- no comments explaining the code — the design conversation is the explanation,
-- no adjacent files produced because they seemed to be implied.
-
-If it feels incomplete, that is information about the plan, not a reason to extend the artifact.
-
-### Phase 4 — Abort-and-withhold gate
-
-If a gap, contradiction, or missing decision surfaces **during** generation:
-
-1. **Discard the partial artifact. Do not show it.** Not in full, not in part, not "for context",
-   not as an illustration of where the problem appeared. Showing it defeats the protocol.
-2. Report only: what was missing, at which point in the design it should have been decided, and
-   the options.
-3. The operator then either amends the design, or rules the gap out of scope and instructs that
-   it be ignored.
-4. Generation restarts from the top only after that is settled.
-
-Reporting the error is always the correct outcome. Producing a working artifact by quietly
-resolving the gap is a failure, even when the resolution was obvious and correct.
-
-### Phase 5 — Transcription to file
-
-An accepted artifact is written to a file only when the operator explicitly instructs it and names
-the path. That write is **transcription**: the accepted text, verbatim.
-
-It is not an occasion to rename anything, reorder anything, add an import, fix a typo, improve a
-type, or apply anything learned since. If the artifact needs changing, that is a new pass through
-the protocol.
-
-_(Assumption made explicit: without this phase nothing would ever run and the harness could not
-produce results. If the operator wants transcription gone entirely, say so and it goes.)_
-
-### Enforcement
-
-Write and Edit against implementation paths are blocked at the harness level, not left to
-discipline — see `.claude/settings.json`. `docs/`, `notes/`, and `README.md` remain writable
-because they are the deliverable that ranks first.
-
-### Why this exists
-
-The protocol is not overhead sitting on top of the work. The plan-then-artifact trail _is_ the
-"how you worked" deliverable, and it is the one the exercise ranks above the code.
-
----
+Scope discipline is the one hard rule: build what was agreed. Adding an unrequested helper,
+extension point, or config hook is scope, and this exercise warns against volume four separate
+times. If something genuinely needs adding, add it and say you did.
 
 ## Interaction rules
 
@@ -168,9 +91,9 @@ The protocol is not overhead sitting on top of the work. The plan-then-artifact 
   Every prompt must be self-contained.
 - Never design a workflow that requires agents to talk to each other. The main session mediates
   every exchange, and every hop costs tokens and loses information. Subagents are for parallel,
-  independent, read-only work.
-- Subagents are bound by the Code Production Protocol exactly as the main session is. A subagent
-  may read, search, analyse, and run commands. It may not author implementation files.
+  independent work.
+- The dev and tester agents write files. Reviewer, qa and architect do not — a reviewer that writes
+  the fix stops being a second pair of eyes.
 - Context they receive: this file and any rules without `paths` frontmatter load at session start;
   path-gated rules load when a matching file is read. Memory contents do not load — pass values
   explicitly in the prompt.
