@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm format:check)",
+      "Bash(pnpm check)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(pnpm exec eslint:*)",
+      "Bash(pnpm exec vitest:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(gh:*)",
+      "Write(docs/**)",
+      "Edit(docs/**)",
+      "Write(notes/**)",
+      "Edit(notes/**)",
+      "Write(adapters/**)",
+      "Edit(adapters/**)"
+    ],
+    "deny": [
+      "Write(src/**)",
+      "Edit(src/**)",
+      "Write(tests/**)",
+      "Edit(tests/**)",
+      "Write(fixtures/**)",
+      "Edit(fixtures/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cd \"$(git rev-parse --show-toplevel)\" && node .claude/hooks/guard-bash.mjs'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

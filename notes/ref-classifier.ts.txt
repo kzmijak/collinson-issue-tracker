@@ -1,0 +1,34 @@
+import { JsonPrompt, schemaToSpec } from '@hphsts/agents';
+import { z } from 'zod';
+import type { DocumentType } from '../roles/ScribeRole.js';
+
+export class ClassifyTypePrompt extends JsonPrompt<DocumentType> {
+  constructor(private readonly raw: string) {
+    super();
+  }
+
+  override createMessage(): string {
+    return [
+      'Classify this document as exactly one of:',
+      '- pattern: architectural or design pattern',
+      '- tool: specific utility with an API or signature',
+      '- context: background knowledge or prerequisite',
+      '- config: configuration convention',
+      '',
+      schemaToSpec(outputSchema),
+      '',
+      '--- DOCUMENT ---',
+      this.raw,
+      '--- END DOCUMENT ---',
+    ].join('\n');
+  }
+
+  protected outputParser(output: object): DocumentType {
+    const result = outputSchema.safeParse(output);
+    return result.success ? result.data.type : 'pattern';
+  }
+}
+
+const outputSchema = z.object({
+  type: z.enum(['pattern', 'tool', 'context', 'config']).describe('document type'),
+});

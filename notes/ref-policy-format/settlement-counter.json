@@ -1,0 +1,5 @@
+{
+  "id": "settlement-counter",
+  "trigger": "allSettled",
+  "content": "Unanimous settlement detected. The debate is not over. What is the strongest argument against your consensus? What edge cases have you missed? What would make this decision wrong in 6 months? Reset your settled status and respond substantively."
+}

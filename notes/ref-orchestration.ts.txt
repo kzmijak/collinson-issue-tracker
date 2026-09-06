@@ -1,0 +1,64 @@
+import type { Chronicle, ChronicleEvent, Participant } from '@hphsts/agents';
+import type { Injector } from './Injector.js';
+
+export class OrchestrationEngine<TEvent extends ChronicleEvent> {
+  constructor(
+    protected readonly chronicle: Chronicle<TEvent>,
+    protected readonly shouldStop: () => boolean
+  ) {}
+
+  async announce(...events: TEvent[]) {
+    await this.chronicle.write(...events);
+  }
+
+  async runInjectors(injectors: Injector<TEvent>[]) {
+    for (const injector of injectors) {
+      const injection = injector.evaluate(this.chronicle);
+      if (!injection) continue;
+
+      await this.announce(injection);
+    }
+  }
+
+  async everyoneSequentially<TParticipant extends Participant>(
+    participants: TParticipant[],
+    performance: (participant: TParticipant) => Promise<void>
+  ) {
+    for (const participant of participants) {
+      if (!this.shouldStop()) await performance(participant);
+    }
+  }
+
+  async everyoneAtRandom<TParticipant extends Participant>(
+    participants: TParticipant[],
+    performance: (participant: TParticipant) => Promise<void>
+  ) {
+    for (const participant of shuffled(participants)) {
+      if (!this.shouldStop()) await performance(participant);
+    }
+  }
+
+  async everyoneAtRandomAsync<TParticipant extends Participant, TResult>(
+    participants: TParticipant[],
+    performance: (participant: TParticipant) => Promise<TResult | null>
+  ): Promise<TResult[]> {
+    const performances = participants.map(
+      (participant) =>
+        new Promise<TResult | null>((resolve, reject) => {
+          if (this.shouldStop()) return resolve(null);
+          performance(participant).then(resolve).catch(reject);
+        })
+    );
+    const awaited = await Promise.all(performances);
+    return awaited.filter((a): a is Awaited<TResult> => a !== null && a !== undefined);
+  }
+}
+
+function shuffled<TItem>(array: TItem[]): TItem[] {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}

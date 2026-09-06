@@ -1,0 +1,89 @@
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { resolveNodes } from './server/src/tools/query.js';
+
+const VAULT_ROOT = join(import.meta.dirname, 'vault');
+const FIXTURES_DIR = join(import.meta.dirname, 'test', 'query-regression');
+
+interface Fixture {
+  description: string;
+  selectedTags: string[];
+  antiTags?: string[];
+  expectedStems?: string[];
+  excludedStems?: string[];
+}
+
+interface TestResult {
+  fixture: string;
+  passed: boolean;
+  failures: string[];
+  resolvedStems: string[];
+}
+
+async function runFixture(fixture: Fixture): Promise<TestResult> {
+  const resolvedStems = await resolveNodes(
+    VAULT_ROOT,
+    fixture.selectedTags,
+    fixture.antiTags ?? []
+  );
+
+  const failures: string[] = [];
+
+  for (const stem of fixture.expectedStems ?? []) {
+    if (!resolvedStems.includes(stem)) {
+      failures.push(`expected [[${stem}]] but not found`);
+    }
+  }
+
+  for (const stem of fixture.excludedStems ?? []) {
+    if (resolvedStems.includes(stem)) {
+      failures.push(`[[${stem}]] should be excluded but was included`);
+    }
+  }
+
+  return {
+    fixture: fixture.description,
+    passed: failures.length === 0,
+    failures,
+    resolvedStems,
+  };
+}
+
+async function main(): Promise<void> {
+  const entries = await readdir(FIXTURES_DIR, { withFileTypes: true });
+  const files = entries
+    .filter((e) => e.isFile() && e.name.endsWith('.json'))
+    .map((e) => e.name)
+    .sort();
+
+  if (files.length === 0) {
+    console.log('No fixtures found in test/query-regression/');
+    return;
+  }
+
+  const results: TestResult[] = [];
+
+  for (const file of files) {
+    const raw = await readFile(join(FIXTURES_DIR, file), 'utf-8');
+    const fixture = JSON.parse(raw) as Fixture;
+    process.stdout.write(`Running: ${fixture.description}... `);
+    const result = await runFixture(fixture);
+    results.push(result);
+    console.log(result.passed ? '✓' : '✗');
+    if (!result.passed) {
+      for (const f of result.failures) console.log(`  → ${f}`);
+    }
+    console.log(`  Resolved: ${result.resolvedStems.join(', ') || '(none)'}`);
+  }
+
+  const passed = results.filter((r) => r.passed).length;
+  const total = results.length;
+  console.log(`\n${passed}/${total} passed`);
+
+  if (passed < total) process.exitCode = 1;
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

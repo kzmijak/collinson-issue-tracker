@@ -1,0 +1,62 @@
+import { Chronicle } from '@hphsts/agents';
+import { OrchestrationEngine } from '@/lib/OrchestrationEngine.js';
+import type { TokenUsage } from '@/lib/OrchestrationEngine.types.js';
+import type { Participant } from '@hphsts/agents';
+import { type DebateEvent, type Summary, type Usage } from './types/events.js';
+
+export class DebateEngine extends OrchestrationEngine<DebateEvent> {
+  private startedAt = Date.now();
+  private round = 1;
+
+  constructor(
+    chronicle: Chronicle<DebateEvent>,
+    private readonly budget = 200_000
+  ) {
+    super(chronicle, () => this.isBudgetExceeded());
+  }
+
+  async eachRoundSequentially(roundScript: () => Promise<void>) {
+    do {
+      await roundScript();
+      this.round++;
+    } while (!this.shouldStop());
+  }
+
+  getHangingActorEvents(participant: Participant): DebateEvent[] {
+    return this.chronicle
+      .readAfterLast((e) => 'authorName' in e && e.authorName === participant.name)
+      .filter(
+        (e) =>
+          ('visibility' in e && e.visibility === 'everyone') ||
+          ('visibility' in e &&
+            e.visibility === 'author-only' &&
+            'authorName' in e &&
+            e.authorName === participant.name)
+      );
+  }
+
+  async publishSummary() {
+    const summary: Summary = {
+      type: 'summary',
+      budget: this.budget,
+      effectiveTokensSpent: this.effectiveTokensSpent,
+      rounds: this.round - 1,
+      startedAt: this.startedAt,
+      visibility: 'everyone',
+      durationMs: Date.now() - this.startedAt,
+    };
+
+    await this.announce(summary);
+  }
+
+  get effectiveTokensSpent(): number {
+    return this.chronicle
+      .readAll()
+      .filter((e): e is Usage => e.type === 'usage')
+      .reduce((sum, usage: TokenUsage) => sum + usage.effectiveTokens, 0);
+  }
+
+  isBudgetExceeded(): boolean {
+    return this.effectiveTokensSpent >= this.budget;
+  }
+}

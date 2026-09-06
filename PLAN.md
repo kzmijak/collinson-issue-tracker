@@ -1,0 +1,140 @@
+# Plan — collinson-issue-tracker
+
+## What this is
+
+ArgoCD for issue handling. A framework of generic primitives, plus a repo-specific adapter that
+composes them into an actual triage policy. The framework is commodity scaffolding. **The adapter
+is the assessment.**
+
+That split follows the brief directly: _"the decisions you make about scope and approach are part
+of what we want to see"_ and _"we are interested in the choice itself."_ Framework code is
+machinery and can be generated. Which categories matter, which policies apply, what the budget is,
+where a human gets called — those are decisions, and they are what gets measured.
+
+## Architecture
+
+Six primitives. Each one exists in the framework as a seam, and is configured by the adapter.
+
+| #   | Primitive           | Job                                                                                                                             |
+| --- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Meter**           | Accumulates effective tokens across a run, exposes `shouldStop()`, aborts on breach. Wraps every stage, belongs to none.        |
+| 2   | **State**           | Append-only decision log plus a keyed last-applied record. Answers "what did we decide about issue #47, at which content hash." |
+| 3   | **Observer**        | Polls the issues API on a clock, diffs against last-applied, emits work.                                                        |
+| 4   | **Policy resolver** | Loads versioned policy documents from the _target_ repo and selects which apply to this issue.                                  |
+| 5   | **Classifier**      | Issue + resolved policies → structured decision: category, urgency, needs_human, policy verdict, estimated cost.                |
+| 6   | **Gate**            | auto \| manual, with a pluggable channel. Decides whether the proposed action proceeds.                                         |
+
+Delivery is the seventh stage but not a seventh primitive — it is a classifier variant whose
+output is a **fix plan plus cost estimate**, not executed code. Two reasons: nothing in the harness
+scores generated code, and an agent that autonomously opens PRs contradicts the Code Production
+Protocol in `CLAUDE.md`.
+
+## Framework vs adapter
+
+**Framework** (`src/framework/`) — the six primitives, the LLM port, the schema→prompt bridge, the
+harness runner. Repo-agnostic, no domain knowledge, no policy content.
+
+**Adapter** (`adapters/<repo>/`) — policy documents, category taxonomy, urgency bands, budget
+ceilings, gate configuration, the repo link. This is the elaborate part and the part under test.
+
+The seam is deliberately narrow: an adapter is a directory of markdown policies plus one config
+file. That constraint is what makes the framework claim credible.
+
+## What the harness measures
+
+**One thing: decision quality per effective token, across adapter configurations.**
+
+Not "which model is cheapest." The configurations are meaningful because the pipeline is real —
+stages on/off, policies on/off, model and effort per stage, single-pass vs multi-agent classifier.
+The harness answers the brief's question literally: did this change to the adapter make it better,
+and what did the improvement cost.
+
+Metrics, chosen per field rather than uniformly:
+
+- **category** — per-class precision/recall. Never aggregate accuracy; the interesting classes
+  (spam, off-topic, policy violation) are rare, and an aggregate number hides exactly the cases the
+  policy layer exists for.
+- **urgency** — ordinal, so mean absolute error. Being one band off is not the same as three.
+- **needs_human** — asymmetric. A missed escalation costs far more than an unnecessary one, so a
+  cost-weighted score, with the weight stated as an assumption.
+- **estimated_et** — this is a _prediction_, so it gets scored against actual spend on the cases
+  that were executed. Estimation error is a first-class result, not a diagnostic.
+
+The estimate-vs-actual measurement is the most distinctive thing here. It is the service reasoning
+about its own economics, and it is directly the quality-versus-cost trade-off the brief asks for.
+
+## The test set
+
+**The policy document and the labelling rubric are the same file.** Adapter policies have to be
+falsifiable — specific enough that two people can label an issue against them and disagree. Once
+they are that specific, they are the rubric. Not a rubric invented to make evaluation possible;
+the production policy, doing double duty.
+
+Construction:
+
+- Stratified sample from a public repo with real issue volume. The rare classes get deliberately
+  over-represented, and results are reported per class.
+- Hand-labelled against the written rubric, target ~60 issues. GitHub labels are not triage
+  decisions and are too noisy to use as ground truth.
+- A measured agreement check between the hand labels and an LLM judge, reported as a number. If
+  agreement is poor, the rubric is ambiguous and that is a finding worth reporting.
+- A held-out slice, never used while iterating.
+
+**Circularity is the trap.** Policy sits in the prompt, policy is the rubric, the model is scored
+against the rubric — so a system can score well by restating policy rather than applying it.
+Guards: label independently of model output, load the set with borderline cases that need
+interpretation rather than lookup, hold out a slice. This gets named in the README before a
+reviewer names it.
+
+## Scope
+
+**In:** the six primitives, one elaborate adapter, one minimal second adapter (this repo — the
+uroboros, as a portability demo), the harness, the eval set, the reasoning trail.
+
+**Out, deliberately:** webhooks (the observer polls — ArgoCD polls too, and it removes the entire
+inbound-HTTP surface), autonomous PR creation, a live-hosted deployment, multiple custom MCP
+servers, an appeals workflow (it collapses into `needs_human`).
+
+**Stubbed, not built:** the GitHub delivery surface is one port with two implementations —
+`FakeGitHub` records what would have been posted, `RealGitHub` posts. The 👍 approval flow then
+exists as a tested state machine, demonstrable without any webhook infrastructure. Run it once
+against a live issue with `RealGitHub` and put the transcript in `notes/`.
+
+## Open questions and the assumptions taken
+
+Per the brief: _"If you have an open question that you would normally ask a stakeholder, write down
+the question and the assumption you went with."_
+
+1. **Which repo does the primary adapter target?** _Assumption:_ a large public repository with
+   several hundred open issues and an active maintainer culture, chosen for issue diversity rather
+   than familiarity. The uroboros adapter targets this repo as the portability demo — it has too
+   few issues to be a dataset, and letting agents act on the submission repo would pollute the git
+   history, which is deliverable #1.
+2. **Is the multi-agent classifier the shipped design or a measured challenger?** _Assumption:_
+   challenger. Build the single-pass version as the baseline, the multi-agent version as a variant,
+   and let the harness answer whether it is worth its cost. "We built the sophisticated version and
+   measured that it did not pay for itself on six of eight classes" is a better submission than
+   building it unexamined.
+3. **What is the cost of a missed escalation relative to an unnecessary one?** _Assumption:_ 5:1,
+   stated in the README and adjustable, because the metric depends on it and no stakeholder is
+   available to set it.
+4. **Effective tokens or dollars as the budget unit?** _Assumption:_ both, at different layers. ET
+   internally — model-agnostic, which is the point of a framework meant to swap providers — and
+   dollars at the reporting boundary, because that is what a reviewer reads.
+
+## Work order
+
+1. Framework primitives 1, 2, 5 (meter, state, classifier) + `AnthropicLlm` + the cost smoke test.
+   Nothing downstream is trustworthy until the token accounting is verified.
+2. ADR-0001 (framework/adapter split, why the adapter is the deliverable), ADR-0002 (structured
+   output: SDK-native vs the ported schema serializer).
+3. The primary adapter's policy documents. This is the rubric, so it comes before the dataset.
+4. Dataset construction against those policies + the agreement check.
+5. The harness: fixtures → pipeline → per-field metrics → cost. Single measurement, reported well.
+6. Primitives 3, 4, 6 (observer, policy resolver, gate) + the uroboros adapter.
+7. Configuration sweep → the cost/quality frontier table.
+8. README: what was built, how to run it, what the evaluation showed, the assumptions above, and
+   what was cut and why.
+
+Steps 6 and 7 are the ones to drop if time runs short. A note explaining the cut is worth more to
+the reader than a rushed version of either.
