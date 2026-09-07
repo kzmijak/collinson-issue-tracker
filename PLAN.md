@@ -157,9 +157,8 @@ thing cut.
 
 Stated plainly because the architecture section above describes a system that sounds deployable:
 
-- **No production build.** There is a container image, but it installs dependencies and runs the
-  sources through `tsx`. No compile step, no `dist`. It is a reproducibility surface, not a shipping
-  artifact.
+- **No deployment pipeline.** The image is built and run by hand, by me and by a reviewer. No
+  registry, no CI, no orchestration.
 - **No hosted deployment.** The container runs on the reviewer's machine and on mine. Nothing is
   published to a public address, and no reviewer credential is required to run it.
 - **No MCP servers.** The GitHub surface is one port with a fake and a real implementation.
@@ -199,3 +198,14 @@ forecasts. Noted so the debt is visible rather than silent.
 therefore stops being purely an instrument of measurement and becomes a safety device, with a
 ceiling that has to survive a process restart. That strengthens step 1's position in the queue
 rather than weakening it, and it adds a requirement step 1 did not previously carry.
+
+### _2026-09-07_ — the image compiles; the earlier amendment said the opposite
+
+Yesterday's amendment stated the container "runs the sources through `tsx`. No compile step, no
+`dist`." That was written before the question was actually put, and the answer came back the other
+way: the image is a production artifact, so `tsc` emits to `dist` and the image runs the compiled
+output. `tsx` stays on the development side, where it runs the stubs.
+
+Recorded rather than quietly corrected, because the contradiction had already been committed — the
+plan and the spec that followed it said opposite things about the same image. It was caught by the
+spec-review hook, which is the first thing that hook has paid for.
