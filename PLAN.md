@@ -139,28 +139,63 @@ detail, and the decisions that were still open when this was written.
 
 | #   | Step                                                                                     | Notes                                                                                                                                        |
 | --- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | GitHub read path + container image                                                       | The runner has to be runnable by a reviewer before anything it does is worth measuring. Spends no tokens, so it does not wait on the meter.  |
 | 1   | Meter, state, classifier primitives + `AnthropicLlm` + cost smoke test                   | Nothing downstream is trustworthy until token accounting is verified. Independent of every open question below, so it can start immediately. |
 | 2   | ADR on structured output: SDK-native `output_config.format` vs the ported `schemaToSpec` | Deciding _not_ to port a home-grown serializer is a result worth recording.                                                                  |
 | 3   | The primary adapter's policy documents                                                   | These are the labelling rubric, so they precede the dataset. Blocked on the target-repo question.                                            |
 | 4   | Dataset construction + the agreement check                                               | Blocked on who labels. An LLM-labelled set scored by an LLM is a much weaker claim and must be disclosed, not discovered.                    |
 | 5   | The harness: fixtures → pipeline → per-field metrics → cost                              | One measurement, reported well.                                                                                                              |
-| 6   | Observer, policy resolver, gate primitives + the uroboros adapter                        | First to cut.                                                                                                                                |
+| 6   | Observer, policy resolver, gate primitives + the uroboros adapter                        | Observer promoted — it follows step 1. The rest of the row keeps its position. See the amendment.                                            |
 | 7   | Configuration sweep → cost/quality frontier table                                        | Second to cut.                                                                                                                               |
 | 8   | README completion: how to run it, what the evaluation showed                             |                                                                                                                                              |
 
-Steps 6 and 7 are the ones to drop if time runs short. A note explaining the cut is worth more to
-the reader than a rushed version of either.
+Step 7 is now the only remaining candidate to drop; the observer has been promoted out of that list.
+See the amendment. A note explaining a cut is worth more to the reader than a rushed version of the
+thing cut.
 
 ### What this plan does not deliver
 
 Stated plainly because the architecture section above describes a system that sounds deployable:
 
-- **No Docker image and no runtime.** The deliverable is a CLI run with `tsx`, per the brief's
-  "a CLI or plain test output is enough".
+- **No production build.** There is a container image, but it installs dependencies and runs the
+  sources through `tsx`. No compile step, no `dist`. It is a reproducibility surface, not a shipping
+  artifact.
+- **No hosted deployment.** The container runs on the reviewer's machine and on mine. Nothing is
+  published to a public address, and no reviewer credential is required to run it.
 - **No MCP servers.** The GitHub surface is one port with a fake and a real implementation.
 - **No autonomous fix-and-publish.** The delivery stage emits a plan, never a pull request. See
   ADR-0002.
 
-If the system should instead be demonstrable as a running service, that is a different plan and a
-materially larger build — it would compete directly with the harness for time, against a brief that
-warns about volume four separate times.
+This section originally also ruled out the container and the running observer. It no longer does;
+the amendment below records what changed the decision and what was cut to pay for it.
+
+---
+
+## Amendments
+
+Appended as they happen, newest last. Each says what changed and what forced the change.
+
+### _2026-09-06_ — the container and a live observer are in scope; the configuration sweep is cut
+
+This plan stated "No Docker image and no runtime", and argued that a demonstrable running service
+was a different plan that would compete with the harness for time.
+
+That argument was about **deployment for its own sake**, and against that it still holds. The reason
+given is a different one: a reviewer opening this repository should be able to run the thing, and
+`docker run` is a materially lower barrier than "install pnpm 10.20 and Node 22, set environment
+variables, then invoke `tsx`". A container in that role _serves_ the harness — it is how the harness
+gets run reproducibly by someone who is not me — rather than competing with it. On that reading the
+original bullet was answering a question nobody had asked.
+
+The decision extends to a live observer polling the target repository, so that at submission the
+runner is actually running rather than merely runnable.
+
+**What it costs is not yet decided.** The observer was step 6, labelled "first to cut". Promoting it
+means something else eventually pays, and step 7 is the remaining candidate. That cut is not
+declared here: the time budget is not yet known, and an amendment should record decisions, not
+forecasts. Noted so the debt is visible rather than silent.
+
+**A consequence worth stating.** An unattended polling loop spends tokens unattended. The meter
+therefore stops being purely an instrument of measurement and becomes a safety device, with a
+ceiling that has to survive a process restart. That strengthens step 1's position in the queue
+rather than weakening it, and it adds a requirement step 1 did not previously carry.
