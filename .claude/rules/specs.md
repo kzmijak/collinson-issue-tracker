@@ -26,7 +26,7 @@ is a question, not a decision.
 A doubt held before writing, or discovered while writing, goes back to the operator **before the
 spec is finished**. In plain text, in one batch, each with a recommendation.
 
-`CLAUDE.md` says "surface gaps, do not invent through them". Surface means *to the operator*, not
+`CLAUDE.md` says "surface gaps, do not invent through them". Surface means _to the operator_, not
 in prose after the fact.
 
 `Assumptions taken` is for questions an absent stakeholder would have answered — the brief's own
