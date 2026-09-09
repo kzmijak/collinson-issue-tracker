@@ -41,29 +41,6 @@
           }
         ]
       }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "agent",
-            "prompt": "A specification file in specs/ was just written or edited. Review it.\n\nHook payload (the edited file path is in tool_input.file_path): $ARGUMENTS\n\nFirst read .claude/agents/spec-reviewer.md and follow it as your instructions, and read .claude/rules/specs.md for the standard the spec is held to. Then read the edited spec file and review it against them.\n\nYou do NOT have the conversation in which this spec was agreed, so you CANNOT verify traceability. Do not guess at it. Instead, list under 'Untraceable' every line that reads like an authored preference rather than a recorded decision \u2014 invented thresholds, field lists, file layouts, error paths, script names, acceptance checks nobody asked for \u2014 so the session can confirm each against what was actually agreed.\n\nJudge falsifiability and scope fully; those need no conversation.\n\nBe brief. Findings only, no restatement of the spec.",
-            "model": "claude-sonnet-5",
-            "timeout": 180,
-            "statusMessage": "Reviewing spec...",
-            "if": "Write(specs/**)"
-          },
-          {
-            "type": "agent",
-            "prompt": "A specification file in specs/ was just written or edited. Review it.\n\nHook payload (the edited file path is in tool_input.file_path): $ARGUMENTS\n\nFirst read .claude/agents/spec-reviewer.md and follow it as your instructions, and read .claude/rules/specs.md for the standard the spec is held to. Then read the edited spec file and review it against them.\n\nYou do NOT have the conversation in which this spec was agreed, so you CANNOT verify traceability. Do not guess at it. Instead, list under 'Untraceable' every line that reads like an authored preference rather than a recorded decision \u2014 invented thresholds, field lists, file layouts, error paths, script names, acceptance checks nobody asked for \u2014 so the session can confirm each against what was actually agreed.\n\nJudge falsifiability and scope fully; those need no conversation.\n\nBe brief. Findings only, no restatement of the spec.",
-            "model": "claude-sonnet-5",
-            "timeout": 180,
-            "statusMessage": "Reviewing spec...",
-            "if": "Edit(specs/**)"
-          }
-        ]
-      }
     ]
   }
 }
