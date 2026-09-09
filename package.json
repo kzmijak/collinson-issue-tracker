@@ -12,8 +12,11 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+    "test": "tsx src/cli/test.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "enrich": "tsx --env-file-if-exists=.env src/cli/enrich.ts",
+    "commit": "tsx --env-file-if-exists=.env src/cli/commit.ts",
+    "verify": "tsx --env-file-if-exists=.env src/cli/verify.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.96",

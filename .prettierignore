@@ -1,0 +1,8 @@
+# Metrics are records written by the tooling, not source. Prettier collapses the short arrays that
+# JSON.stringify(x, null, 2) always expands, so every run would fail format:check — and reformatting
+# them rewrites evidence that is supposed to stay byte-stable.
+specs/*/metrics/
+
+node_modules
+dist
+pnpm-lock.yaml

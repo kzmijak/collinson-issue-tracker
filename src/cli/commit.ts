@@ -1,0 +1,151 @@
+import { execFileSync } from 'node:child_process';
+import { createInterface } from 'node:readline/promises';
+import { ClaudeCodeLlm, QueryFailedError } from '../llm/ClaudeCodeLlm.js';
+import { readAgentPrompt } from '../spec/agentPrompt.js';
+import { CommitPlanPrompt, type CommitPlan } from '../spec/CommitPlanPrompt.js';
+import { ModelContractError } from '../spec/EnrichPrompt.js';
+import { readFileSync } from 'node:fs';
+import { amendMetrics, latestMetricsPath, type CommitNote } from '../spec/metrics.js';
+import { consoleLogger } from './consoleLogger.js';
+import { banner, note, paragraph, section } from './report.js';
+import { startProgress } from './progress.js';
+
+const PLANNER_DEFINITION = '.claude/agents/git.md';
+const TASK_BUDGET_TOKENS = 30_000;
+const DIFF_LIMIT = 60_000;
+
+const TRAILER = [
+  'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+  'Claude-Session: https://claude.ai/code/session_01TQu9VtwghwVfh62pUzfamQ',
+].join('\n');
+
+const IDENTITY =
+  'You plan commits for collinson-issue-tracker. You produce a plan as data; a script performs it.';
+
+function git(...args: string[]): string {
+  return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+}
+
+function workingTree(): string {
+  const status = git('status', '--short');
+  if (!status.trim()) return '';
+
+  const diff = git('diff', 'HEAD');
+  const truncated =
+    diff.length > DIFF_LIMIT ? `${diff.slice(0, DIFF_LIMIT)}\n… diff truncated …` : diff;
+
+  return [
+    '## git status --short',
+    status,
+    '## recent commits',
+    git('log', '--oneline', '-8'),
+    '## git diff HEAD',
+    truncated,
+  ].join('\n\n');
+}
+
+function show(plan: CommitPlan): void {
+  section(
+    'Proposed commits',
+    plan.commits.map((commit) => ({
+      title: commit.message.split('\n')[0],
+      body: commit.why,
+      bullets: commit.files,
+    })),
+    '+',
+    'green',
+  );
+  section(
+    'Left out',
+    plan.unassigned.length === 0
+      ? []
+      : [{ body: 'The planner could not place these.', bullets: plan.unassigned }],
+    '?',
+    'yellow',
+  );
+}
+
+async function perform(plan: CommitPlan): Promise<void> {
+  for (const commit of plan.commits) {
+    git('reset', 'HEAD', '--');
+    git('add', '--', ...commit.files);
+    git('commit', '-m', `${commit.message.trim()}\n\n${TRAILER}\n`);
+
+    const subject = commit.message.split('\n')[0];
+    const note: CommitNote = {
+      at: new Date().toISOString(),
+      sha: git('rev-parse', '--short', 'HEAD').trim(),
+      subject,
+    };
+    consoleLogger.info(`committed: ${note.sha} ${subject}`);
+    await link(commit.files, note);
+  }
+}
+
+/**
+ * A commit touching a spec's directory is what carried that enrichment into history, so the note
+ * goes on the enrichment's own record. Commits that touch no spec leave no note.
+ */
+async function link(files: string[], note: CommitNote): Promise<void> {
+  const dirs = new Set(
+    files
+      .map((file) => /^(specs\/[^/]+)\//.exec(file)?.[1])
+      .filter((dir): dir is string => Boolean(dir)),
+  );
+
+  for (const dir of dirs) {
+    const path = await latestMetricsPath(dir);
+    if (!path) continue;
+
+    const existing = JSON.parse(readFileSync(path, 'utf8')) as { commits?: CommitNote[] };
+    await amendMetrics(dir, { commits: [...(existing.commits ?? []), note] });
+  }
+}
+
+async function main(): Promise<number> {
+  const state = workingTree();
+
+  if (!state) {
+    banner('CLEAN', 'dim', 'working tree');
+    paragraph('Nothing to commit.');
+    return 0;
+  }
+
+  const llm = new ClaudeCodeLlm('claude-sonnet-5', IDENTITY, {
+    taskBudgetTokens: TASK_BUDGET_TOKENS,
+  });
+  const progress = startProgress('planning commits');
+  const plan = await llm
+    .prompt(new CommitPlanPrompt(readAgentPrompt(PLANNER_DEFINITION), state), { fresh: true })
+    .finally(progress.stop);
+
+  banner(
+    'PLAN',
+    'blue',
+    `${plan.commits.length} commits`,
+    `${Math.round(llm.lastEffectiveTokens).toLocaleString('en-US')} effective tokens`,
+  );
+  show(plan);
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question('\ncommit this plan? [y/N] ');
+  rl.close();
+
+  if (!/^y(es)?$/i.test(answer.trim())) {
+    note('nothing committed — the working tree is untouched');
+    return 1;
+  }
+
+  await perform(plan);
+  return 0;
+}
+
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((error: unknown) => {
+    const known = error instanceof ModelContractError || error instanceof QueryFailedError;
+    consoleLogger.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = known ? 2 : 1;
+  });
