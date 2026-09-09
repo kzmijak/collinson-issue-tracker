@@ -79,6 +79,24 @@ enumerated.** A requirement no case covers is invisible — the check reports gr
 open, and the tooling then reports "nothing to apply" and is lying. Tightness stops being hygiene and
 becomes the condition for the tooling to mean anything.
 
+## A check proves what it sets, never what it omits
+
+An acceptance check that depends on an environment variable must set that variable to an explicit
+value in every case it runs, including the case where the requirement is "the default applies" or
+"this is switched off". Relying on the variable's absence to mean a baseline is invisible to a
+reader of the check and fragile to whoever runs it: an ambient value from the calling shell — a
+leftover export, a `.env` nobody re-checked — silently substitutes for the one the check meant to
+exercise, and the failure that follows blames the implementation instead of the environment.
+
+This is the same rule as "examples, not descriptions" turned into a habit for the check itself: a
+case that means "no simulated failures" writes `GITHUB_MOCK_FAIL_COUNT=0` rather than leaving the
+variable unset, exactly as literally as a case that means "two simulated failures" writes `=2`.
+
+One run of `pnpm apply` was blocked for a thousand seconds and 5,370,381 effective tokens by exactly
+this gap: a case meant "zero simulated failures" by omission, an ambient shell export supplied a
+non-zero value instead, and the check reported a missing issue that the implementation had in fact
+printed. The code was not wrong. The check was not describing what it meant.
+
 ## Amendments
 
 Reality contradicting a spec is recorded by appending an entry to `What I want`, not by editing what
