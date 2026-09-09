@@ -7,10 +7,20 @@ paths:
 # Testing Rules
 
 - Unit and integration tests: Vitest, node environment.
-- Dependency injection with Fake/Real implementations. `FakeGitHub` records what would have been
-  posted; `RealGitHub` posts. Tests run against the Fake.
+- Dependency injection with Fake/Real implementations. `FakeGitHub` reads from a stub and can be
+  told to fail; `RealGitHub` calls the API. Tests run against the Fake, so they depend on neither
+  the network nor the state of anyone's repository.
 - Naming: `describe` per module or function, `it` describing behaviour in plain English.
-- Test file location: `tests/`, mirroring `src/`. Never inside `src/`.
+- **Two kinds of test, two locations.** `tests/` mirrors `src/` and answers "does this module work".
+  `specs/NNN-<slug>/tests/` answers "is this spec satisfied" — the cases the spec enumerates, one
+  apiece. Never inside `src/`.
+- A spec's whole verification runs through `specs/NNN-<slug>/test.bash`, one entry point, because not
+  every spec is provable by Vitest — a container spec is a build, a run and an assertion on stdout.
+  It exits `0` passing, `1` failing, `2` could-not-run-here; the caller must not treat `2` as a
+  failing implementation.
+- **Every case the spec enumerates exists as a test, with its literal value.** A spec naming
+  `GITHUB_REPO=a/b/c` and a suite that never mentions it is a hole the acceptance check cannot see —
+  and the check is also what decides whether there is anything left to implement.
 - LLM calls are not mocked away wholesale — a fake `Llm` returning recorded responses keeps the
   parsing, metering and policy layers under test. Mocking the whole pipeline tests nothing.
 - Quality focus: fast tests > catching real problems > coverage.
