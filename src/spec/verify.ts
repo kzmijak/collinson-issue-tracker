@@ -1,8 +1,9 @@
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import type { Llm } from '../llm/Llm.js';
 import { readAgentPrompt } from './agentPrompt.js';
-import { amendMetrics, latestMetricsPath, METRICS_DIR, type EnrichMetrics } from './metrics.js';
+import { amendMetrics, latestMetricsPath, type EnrichMetrics } from './metrics.js';
+import { readArtefacts } from './readArtefacts.js';
 import { VerifyPrompt, type Verdict } from './VerifyPrompt.js';
 import { setStatus, specSha, splitSpec } from './SpecFile.js';
 
@@ -57,29 +58,4 @@ async function storedVerdict(specDir: string, sha: string): Promise<Verdict | nu
   const previous = record.verification;
 
   return previous?.specSha === sha ? { ...previous } : null;
-}
-
-const ARTEFACT_LIMIT = 20_000;
-
-/**
- * Everything the spec generated alongside itself. Without these the verifier cannot see whether the
- * check can fail — its most important question — and it correctly complains that the contract is
- * delegated to a file it was never shown.
- */
-async function readArtefacts(specDir: string): Promise<string> {
-  const names = await readdir(specDir).catch(() => [] as string[]);
-  const parts: string[] = [];
-
-  for (const name of names.sort()) {
-    if (name === 'spec.md' || name === METRICS_DIR) continue;
-
-    const target = join(specDir, name);
-    if (!(await stat(target)).isFile()) continue;
-
-    const content = await readFile(target, 'utf8');
-    parts.push(
-      `### ${name}\n\n${content.length > ARTEFACT_LIMIT ? `${content.slice(0, ARTEFACT_LIMIT)}\n… truncated …` : content}`,
-    );
-  }
-  return parts.join('\n\n');
 }
