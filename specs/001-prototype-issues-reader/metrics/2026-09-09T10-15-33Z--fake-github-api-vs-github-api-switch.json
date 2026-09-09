@@ -45,6 +45,11 @@
       "at": "2026-09-09T17:06:16.967Z",
       "sha": "0e9eda0",
       "subject": "spec(worker): 001 — prototype issues reader"
+    },
+    {
+      "at": "2026-09-09T17:10:06.335Z",
+      "sha": "efacdc7",
+      "subject": "chore(metrics): record commit link for the 001 prototype spec"
     }
   ]
 }
