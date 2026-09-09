@@ -59,7 +59,8 @@ LLM-driven GitHub issue triage, plus repo-specific adapters. Read `PLAN.md` befo
 - If finishing would mean inventing a behaviour nobody decided — an error path, a threshold, a policy
   default — pick one and **write down that you picked it**. Silently choosing is the failure.
 - Build what was agreed. An unrequested helper or extension point is scope.
-- Do NOT commit. Leave that to the operator.
+- Do NOT commit, stage, or run any git write command. A hook blocks them and the `git` agent owns
+  commits. Leave your work in the working tree and report what you changed.
 - Do NOT review your own code. That is the reviewer agent.
 - Follow the quality matrix below.
 
