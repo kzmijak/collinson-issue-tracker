@@ -1,0 +1,49 @@
+{
+  "at": "2026-09-09T10:03:17.655Z",
+  "durationMs": 3,
+  "entry": "2026-09-09 — Fake GitHub API vs GitHub API switch",
+  "sourceSha": "d611d2d0accc",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadTokens": 0,
+    "cacheCreationTokens": 0
+  },
+  "effectiveTokens": 0,
+  "outcome": "unchanged",
+  "verification": {
+    "at": "2026-09-09T10:04:17.974Z",
+    "verdict": "rejected",
+    "summary": "The check is falsifiable for the issue-line and loading-phase assertions, but the spec's own description of the indicator as \"self-updating\" contradicts the check's requirement that each dot-phase appear as a distinct, complete stdout line, leaving the implementer to guess which reading to satisfy. Traceability is unchecked — I was not given the conversation this spec was agreed in.",
+    "mustFix": [
+      {
+        "area": "Falsifiability",
+        "quote": "appends each newly-seen open issue as a line above a self-updating loading indicator",
+        "problem": "\"Self-updating\" naturally reads as in-place overwrite (e.g. carriage-return redraw), which would never emit 'Loading .', 'Loading ..', 'Loading ...' as three separate newline-terminated lines. An implementer following this description would fail `grep -qxF` in test.bash, which requires each phase as its own exact line; the spec does not say which reading governs."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Coverage",
+        "quote": "Use Exponential Backoff strategy to handle exceptions. Double the interval after each consecutive error, reset the counter on success.",
+        "problem": "This is carried into the spec as a decided requirement (implicitly, via the 'Not this' row excluding only rate-limit handling 'beyond' backoff) but no Behaviour row or line in test.bash exercises an error/backoff path; the check can pass with backoff entirely unimplemented."
+      },
+      {
+        "area": "Coverage",
+        "quote": "Loading indicator always appears at the bottom, separated by whitespace line from the rest of the output.",
+        "problem": "This decided formatting rule (blank-line separation between issue log and indicator) is not asserted anywhere in test.bash, so the check passes whether or not the separator is present."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Method",
+        "quote": "generated: 2026-09-09\nsource-sha: d611d2d0accc\nstatus: unverified",
+        "problem": "Spec is marked unverified/draft with no PLAN.md step number filled in ('work-order step N'), so its place in the sequence and whether it has been run against real code cannot be confirmed from the file alone."
+      }
+    ],
+    "effectiveTokens": 43661.5,
+    "specSha": "2926cb564050"
+  }
+}

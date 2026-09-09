@@ -1,0 +1,31 @@
+{
+  "at": "2026-09-09T10:12:24.792Z",
+  "durationMs": 74642,
+  "entry": "2026-09-09 — Fake GitHub API vs GitHub API switch",
+  "sourceSha": "d611d2d0accc",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 25,
+    "outputTokens": 8519,
+    "cacheReadTokens": 4894,
+    "cacheCreationTokens": 5260
+  },
+  "effectiveTokens": 99368.8,
+  "outcome": "written",
+  "files": [
+    "specs/001-prototype-issues-reader/test.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 1,
+    "assumptions": 6,
+    "decisions": 6,
+    "behaviours": 5,
+    "cases": 5,
+    "doneWhen": 1,
+    "outOfScope": 3,
+    "files": 1
+  }
+}

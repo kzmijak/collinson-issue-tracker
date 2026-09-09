@@ -1,0 +1,16 @@
+{
+  "at": "2026-09-09T10:14:49.730Z",
+  "durationMs": 12,
+  "entry": "2026-09-09 — Fake GitHub API vs GitHub API switch",
+  "sourceSha": "d611d2d0accc",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadTokens": 0,
+    "cacheCreationTokens": 0
+  },
+  "effectiveTokens": 0,
+  "outcome": "unchanged"
+}

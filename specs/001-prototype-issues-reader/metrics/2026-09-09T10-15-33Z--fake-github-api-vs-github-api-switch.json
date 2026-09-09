@@ -1,0 +1,43 @@
+{
+  "at": "2026-09-09T10:15:33.965Z",
+  "durationMs": 3,
+  "entry": "2026-09-09 — Fake GitHub API vs GitHub API switch",
+  "sourceSha": "d611d2d0accc",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "cacheReadTokens": 0,
+    "cacheCreationTokens": 0
+  },
+  "effectiveTokens": 0,
+  "outcome": "unchanged",
+  "verification": {
+    "at": "2026-09-09T10:17:39.385Z",
+    "verdict": "accepted",
+    "summary": "The check is falsifiable and each behaviour has a concrete assertion; the two weak spots are timing tightness in Part 1 and an unfilled PLAN.md reference. Traceability unchecked — I was not given the actual operator exchanges, only the spec's own quoted excerpts.",
+    "mustFix": [],
+    "shouldFix": [
+      {
+        "area": "Falsifiability",
+        "quote": "timeout 4s pnpm prototype-issues-reader > \"$OUT1\" 2>&1 || true",
+        "problem": "With a 1s indicator tick and a correctly-implemented process, three distinct dot-phases plus two issue lines must all land inside a 4s window that also includes process startup. Any startup lag near ~1s makes a correct implementation fail this check."
+      },
+      {
+        "area": "Method",
+        "quote": "Covers: work-order step N in PLAN.md",
+        "problem": "The placeholder 'N' was never filled in, so there is no actual traceable link to a PLAN.md step despite the header claiming one exists."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Coverage",
+        "quote": "asserting the exact backoff multiplier sequence beyond a single minimum-elapsed-time check",
+        "problem": "A fixed 2.5s+ delay with no real doubling would also pass Part 2, so the check proves 'some delay happened' rather than 'exponential backoff happened'. This is declared out of scope already, so it's a known gap, not a hidden one."
+      }
+    ],
+    "effectiveTokens": 42716.5,
+    "specSha": "39a02113bbe7"
+  }
+}
