@@ -3,9 +3,7 @@ import { Prompt } from './Prompt.js';
 
 export abstract class JsonPrompt<TOutput> extends Prompt<TOutput> {
   parseOutput(output: string): TOutput {
-    const start = output.indexOf('{');
-    const end = output.lastIndexOf('}');
-    const json = start >= 0 && end > start ? output.slice(start, end + 1) : '{}';
+    const json = extractJson(output);
     try {
       return this.outputParser(JSON.parse(jsonrepair(json)));
     } catch (e) {
@@ -16,4 +14,18 @@ export abstract class JsonPrompt<TOutput> extends Prompt<TOutput> {
   }
 
   protected abstract outputParser(output: object): TOutput;
+}
+
+/**
+ * A model asked for JSON often surrounds it with prose, and prose contains braces. Prefer the last
+ * fenced block, which is the answer; fall back to the outermost braces only when there is no fence.
+ */
+function extractJson(output: string): string {
+  const fenced = [...output.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/g)].at(-1)?.[1];
+  if (fenced?.trim().startsWith('{')) return fenced;
+
+  const start = output.indexOf('{');
+  const end = output.lastIndexOf('}');
+
+  return start >= 0 && end > start ? output.slice(start, end + 1) : '{}';
 }
