@@ -144,5 +144,12 @@
     "effectiveTokens": 5370381,
     "model": "claude-opus-5",
     "specSha": "38c947752197"
-  }
+  },
+  "commits": [
+    {
+      "at": "2026-09-09T18:42:23.640Z",
+      "sha": "e92704d",
+      "subject": "spec(001-prototype-issues-reader): switch status bar to in-place redraw with inline errors"
+    }
+  ]
 }
