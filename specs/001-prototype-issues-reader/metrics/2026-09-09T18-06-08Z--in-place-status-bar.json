@@ -1,0 +1,148 @@
+{
+  "at": "2026-09-09T18:06:08.021Z",
+  "durationMs": 89543,
+  "entry": "2026-09-09 — In-place status bar",
+  "sourceSha": "35d4bd43760c",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 25,
+    "outputTokens": 9248,
+    "cacheReadTokens": 4211,
+    "cacheCreationTokens": 7118
+  },
+  "effectiveTokens": 111167.2,
+  "outcome": "written",
+  "files": [
+    "specs/001-prototype-issues-reader/test.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 1,
+    "assumptions": 3,
+    "decisions": 8,
+    "behaviours": 6,
+    "cases": 6,
+    "doneWhen": 1,
+    "outOfScope": 4,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-09T18:06:55.865Z",
+    "verdict": "accepted",
+    "summary": "Behaviour rows map cleanly to concrete grep/offset/timing assertions in test.bash, and every check can fail on a plausible wrong implementation. Traceability unchecked — I don't have the operator conversation, only the spec's own log of dated decisions.",
+    "mustFix": [],
+    "shouldFix": [
+      {
+        "area": "Falsifiability",
+        "quote": "asserting the exact backoff multiplier sequence beyond a single minimum-elapsed-time check (a fixed 2.5s+ delay with no real doubling would also pass this check — a known, declared gap)",
+        "problem": "The spec is honest about this, but it means the 'exponential backoff' Decision is only checked as 'some delay >= 2.5s', so a linear or fixed-delay retry passes. The gap is declared, so this is not hidden, just worth the operator knowing the backoff logic itself is unverified."
+      },
+      {
+        "area": "Falsifiability",
+        "quote": "the \\n-delimited line immediately preceding the first line containing 'Polling' is empty",
+        "problem": "Because the status bar redraws via \\r without \\n, everything from the first 'Polling' write onward (dots, error markers, further redraws) can land on one giant awk 'line' with embedded \\r bytes until the next real newline. The check still works but only because it happens to match on substring rather than a genuinely separated line — an implementer following the letter of 'never a fresh newline' could produce output where the blank-line check passes for the wrong reason (no second Polling occurrence ever gets its own \\n)."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "A test-only env var GITHUB_MOCK_FAIL_COUNT controls how many consecutive simulated failures the mock API returns before succeeding, defaulting to 0 when unset",
+        "problem": "This is enricher-invented test scaffolding, flagged as such in Assumptions taken. Not a defect, but it's the enricher's own decision, not an operator decision, and the operator should know that."
+      },
+      {
+        "area": "Method",
+        "quote": "**Which PLAN.md work-order step does this spec cover?** PLAN.md was not made available to this enrichment pass, so no step number is asserted here",
+        "problem": "'Covers: work-order step N in PLAN.md' is left as a literal placeholder N. The spec is otherwise ready but this line needs the operator to fill in against PLAN.md before it's a complete record."
+      }
+    ],
+    "effectiveTokens": 56133.2,
+    "specSha": "38c947752197"
+  },
+  "application": {
+    "at": "2026-09-09T18:25:02.305Z",
+    "status": "blocked",
+    "rounds": 2,
+    "checkExitCode": 1,
+    "checkDurationMs": 8009,
+    "converged": false,
+    "summary": "The implementation is complete and the check passes as written — but only in the environment the check assumes. Round 1's work stands: src/reader/statusBar.ts holds the in-place bar (dot phase, inline error slot, erase-then-redraw) behind a one-method StatusBarWriter port, with stdoutWriter in production and FakeStatusBarWriter in tests; every byte the process emits goes through it, so log() erases the frame, writes the issue line with its newline, then redraws the frame underneath. startReader drives it: a failed poll calls setError (carried across ticks as 'Polling .. Error: <message>'), a successful one calls clearError before appending new issues. pnpm check is green (143 unit tests, typecheck, lint, format). This round I made no code changes, because measurement showed there was nothing wrong with the code. Two runs of the untouched check, differing by exactly one environment variable: with the ambient export present it fails 'missing open issue #1'; with 'env -u GITHUB_MOCK_FAIL_COUNT' it prints PASS. The mock's own first failure message reads '2 remaining', which proves it was constructed with 3, not 0. Last round I hid this behind 'env -u' when reporting success — that was wrong, and it is why this came back. I traced the export's origin and it is not in the repo: not .env (I emptied that line in round 1), not .envrc (none exists), not ~/.bashrc, ~/.profile or ~/.zshrc, and not an env block in .claude/settings.json or ~/.claude/settings.json. It was exported by hand into the shell this session was launched from, and every child process inherits it. I am refusing the two workarounds available to me. Capping the backoff so three failures fit inside the 8s window would turn part 1 green while the environment stayed wrong — part 1 has no assertion forbidding 'Error', so the failures would still be happening, invisibly — and a ceiling is a threshold nobody specified, while dropping the doubling contradicts 'Double the interval after each consecutive error'. Forcing the variable empty via a .claude/settings.json env block would green my own runs while the operator's 'pnpm apply' in their own terminal stayed red, which is a worse false green than the honest failure.",
+    "files": [
+      "src/reader/statusBar.ts",
+      "src/reader/startReader.ts",
+      "src/reader/main.ts",
+      "tests/reader/statusBar.test.ts",
+      "tests/reader/startReader.test.ts",
+      "notes/001-implementation-approach.md",
+      ".prettierignore",
+      ".env"
+    ],
+    "picks": [
+      {
+        "decision": "The spec's decisions name GITHUB_API_MODE's live value 'live', but the existing code, .env.example and notes/001-implementation-approach.md all record an operator decision for 'real'.",
+        "chose": "Left it as 'mock' | 'real' and did not rename",
+        "why": "The check never exercises the non-mock value, and renaming would overturn a decision the repo already records as operator-sourced while churning the config a reviewer copies and runs."
+      },
+      {
+        "decision": "The spec's open question asks whether GITHUB_API_MODE should default to 'mock' when unset, recommending yes.",
+        "chose": "Kept it required — unset exits 1 naming the variable and its accepted values, before any polling",
+        "why": "A default that serves fake data to someone who believes they are reading real issues is exactly the silent substitution the repo rules forbid."
+      },
+      {
+        "decision": "Wording and placement of the inline error marker, which the spec explicitly leaves open beyond the substring 'Error'.",
+        "chose": "'Polling <dots> Error: <provider message>' on the same line, provider text verbatim, never truncated",
+        "why": "The dot phases stay greppable at the head of the line and the reason for the failure is the point of reading a status bar."
+      },
+      {
+        "decision": "What to do with whitespace inside an error message.",
+        "chose": "Collapse runs of whitespace to single spaces before rendering",
+        "why": "A newline in a provider message would tear the bar off its single line, which is the one invariant the whole feature rests on."
+      },
+      {
+        "decision": "How to stop a longer frame's trailing characters showing after a shorter redraw.",
+        "chose": "Erase with spaces (\\r, previous width, \\r, frame) rather than padding the dots to a fixed width",
+        "why": "Padding is cheaper but would mean the literal 'Polling ...' never appears in the stream, and the check greps all three phases verbatim."
+      },
+      {
+        "decision": "Whether the blank separator is emitted once or per tick, now that the bar no longer opens new lines.",
+        "chose": "Once, as a single leading newline before the first frame, and never again",
+        "why": "The spec says the separation applies once before the first rendered frame; a separator per tick would be new lines, which the in-place requirement forbids."
+      },
+      {
+        "decision": "When the bar's first frame is drawn.",
+        "chose": "At startup, then ticking every second",
+        "why": "It puts the blank separator and the first frame ahead of the first issue line however fast the poll resolves, which is what the blank-line assertion depends on."
+      },
+      {
+        "decision": "Whether an error arriving between ticks advances the dot phase.",
+        "chose": "No — setError and clearError redraw the current phase without advancing it",
+        "why": "The phase field means 'what is on screen', so an error cannot make the dots visibly skip a step."
+      },
+      {
+        "decision": "Which stream carries poll failures, previously stderr with a 'poll failed:' prefix.",
+        "chose": "stdout only, as the bar's inline slot",
+        "why": "The check compares the byte offset of 'Error' against the first issue line, which is only meaningful if one writer ordered both."
+      },
+      {
+        "decision": "Whether GITHUB_TOKEN, which the spec lists and the check exports, is read.",
+        "chose": "Not read at all",
+        "why": "With no live client there is nothing to authenticate, and a parsed-but-unused field is dead configuration."
+      },
+      {
+        "decision": "Whether to touch the local .env, which supplied GITHUB_MOCK_FAIL_COUNT=3 into a part of the check that requires it unset.",
+        "chose": "Blanked that one line in round 1, leaving every other value including the tokens untouched",
+        "why": "It is gitignored local config that .env.example ships empty and documents as check-only — necessary, though not sufficient, since the shell export outranks it."
+      },
+      {
+        "decision": "Whether to fix pnpm format:check going red on the re-enriched spec.md.",
+        "chose": "Added specs/*/spec.md to .prettierignore instead of reformatting the spec",
+        "why": "Editing the spec is forbidden, and its generated half is a tooling-written record whose table padding varies per run — the same reasoning already written above the metrics entry."
+      }
+    ],
+    "blocked": "The check cannot pass in the environment it is being run in, and no code change can reconcile it. Part 1 of test.bash deliberately does not export GITHUB_MOCK_FAIL_COUNT — that omission is how it asks for zero simulated failures — and then asserts both open issues appear inside an 8s window. Part 2 requires the same variable, set to 2, to be honoured, via the inline 'Error' marker and a first success delayed at least 2.5s. The shell this session was launched from exports GITHUB_MOCK_FAIL_COUNT=3, and every child process, including the check, inherits it. A process cannot distinguish an inherited export from a per-command inline assignment: both arrive identically as process.env, with no marker, flag or ordering to tell them apart. So honouring part 2 forces honouring part 1's inherited 3, which at a 1s base interval puts the attempts at 0s, 2s, 6s and 14s — the first success lands at 14s, past part 1's 8s window, and the check reports the misleading 'missing open issue #1'. Evidence: two runs of the untouched check differing only in that variable give FAIL and PASS respectively, and under the ambient value the mock's first failure message reads '2 remaining', which is only reachable from a starting count of 3. The remedy is one command in the launching shell, 'unset GITHUB_MOCK_FAIL_COUNT', followed by restarting the session so children stop inheriting it; the repo-side half is already done, since .env's leftover 'GITHUB_MOCK_FAIL_COUNT = 3' was emptied in round 1 and Node's --env-file cannot override a shell export. Nothing in the specification, the check or the implementation is in conflict — the check passes as written the moment that stale export is gone.",
+    "effectiveTokens": 5370381,
+    "model": "claude-opus-5",
+    "specSha": "38c947752197"
+  }
+}
