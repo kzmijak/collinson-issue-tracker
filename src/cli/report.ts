@@ -55,6 +55,20 @@ export function section(heading: string, items: ReportItem[], marker: string, co
   }
 }
 
+/**
+ * The first few sentences, and no more. A model asked for three sentences sometimes sends twenty,
+ * and the terminal is the wrong place to discover that — the full text is in the metrics record.
+ */
+export function brief(text: string, sentences = 3, limit = 420): string {
+  const kept = text
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .slice(0, sentences)
+    .join(' ');
+
+  return kept.length > limit ? `${kept.slice(0, limit - 1).trimEnd()}…` : kept;
+}
+
 export function note(text: string): void {
   consoleLogger.info(style(`\n${text}`, 'dim'));
 }
