@@ -66,6 +66,8 @@ function show(plan: CommitPlan): void {
 }
 
 async function perform(plan: CommitPlan): Promise<void> {
+  const linked = new Set<string>();
+
   for (const commit of plan.commits) {
     git('reset', 'HEAD', '--');
     git('add', '--', ...commit.files);
@@ -78,20 +80,43 @@ async function perform(plan: CommitPlan): Promise<void> {
       subject,
     };
     consoleLogger.info(`committed: ${note.sha} ${subject}`);
-    await link(commit.files, note);
+    for (const path of await link(commit.files, note)) linked.add(path);
   }
+  commitNotes([...linked]);
+}
+
+/**
+ * The notes can only be written after the commits they name, so they cannot ride inside them. One
+ * trailing commit is the honest way out: without it every run of this command leaves the tree dirty
+ * with a record of what it just did.
+ */
+function commitNotes(paths: string[]): void {
+  if (paths.length === 0) return;
+
+  git('reset', 'HEAD', '--');
+  git('add', '--', ...paths);
+  git(
+    'commit',
+    '-m',
+    `chore(metrics): link enrichments to the commits that carried them\n\n` +
+      `A commit note names the commit that carried an enrichment into history, so it can only be\n` +
+      `written afterwards. This commit is that record.\n\n${TRAILER}\n`,
+  );
+  consoleLogger.info(`committed: ${git('rev-parse', '--short', 'HEAD').trim()} the notes above`);
 }
 
 /**
  * A commit touching a spec's directory is what carried that enrichment into history, so the note
  * goes on the enrichment's own record. Commits that touch no spec leave no note.
  */
-async function link(files: string[], note: CommitNote): Promise<void> {
+async function link(files: string[], note: CommitNote): Promise<string[]> {
   const dirs = new Set(
     files
       .map((file) => /^(specs\/[^/]+)\//.exec(file)?.[1])
       .filter((dir): dir is string => Boolean(dir)),
   );
+
+  const written: string[] = [];
 
   for (const dir of dirs) {
     const path = await latestMetricsPath(dir);
@@ -99,7 +124,9 @@ async function link(files: string[], note: CommitNote): Promise<void> {
 
     const existing = JSON.parse(readFileSync(path, 'utf8')) as { commits?: CommitNote[] };
     await amendMetrics(dir, { commits: [...(existing.commits ?? []), note] });
+    written.push(path);
   }
+  return written;
 }
 
 async function main(): Promise<number> {
