@@ -39,5 +39,12 @@
     ],
     "effectiveTokens": 42716.5,
     "specSha": "39a02113bbe7"
-  }
+  },
+  "commits": [
+    {
+      "at": "2026-09-09T17:06:16.967Z",
+      "sha": "0e9eda0",
+      "subject": "spec(worker): 001 — prototype issues reader"
+    }
+  ]
 }
