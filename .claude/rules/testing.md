@@ -18,6 +18,16 @@ paths:
   every spec is provable by Vitest — a container spec is a build, a run and an assertion on stdout.
   It exits `0` passing, `1` failing, `2` could-not-run-here; the caller must not treat `2` as a
   failing implementation.
+- **One entry point does not mean one kind of proof inside it.** `test.bash` should call the fast
+  Vitest suite for whatever it can prove without a real process — a dot-cycle schedule, a backoff
+  doubling, a format string — and reserve its own slower section for what only a real process
+  proves: that the entrypoint exists, that a config error exits non-zero before doing work, that
+  bytes on stdout actually look the way the fast suite assumed. A `test.bash` that re-derives
+  timing or formatting logic byte-by-byte against a live process is proving the same thing twice,
+  slowly and with a clock in the loop instead of a fake timer. Spec 001's first `test.bash` did
+  this and ran to two long, wall-clock-bound sections; the reader's own `startReader.test.ts` proves
+  the backoff schedule in milliseconds on fake timers, which is the version of this proof that
+  belongs in a check run every round of `pnpm apply`.
 - **Every case the spec enumerates exists as a test, with its literal value.** A spec naming
   `GITHUB_REPO=a/b/c` and a suite that never mentions it is a hole the acceptance check cannot see —
   and the check is also what decides whether there is anything left to implement.
