@@ -3,8 +3,22 @@
 The executable layer. `PLAN.md` says what the system is and why; a spec says what to build next and
 how we will know it worked. One spec per work-order step, committed **before** its implementation.
 
-Numbered sequentially: `001-meter-and-llm-port.md`, `002-...`. The number is the order they were
-written, not a priority.
+One directory per spec, numbered in the order they were written rather than by priority:
+
+```
+specs/001-<slug>/
+├─ spec.md      ← the spec
+├─ tests/       ← what proves this spec, as opposed to what proves a module
+└─ test.bash    ← the whole verification procedure, one entry point
+```
+
+`test.bash` exists because not every spec can be proved by Vitest — a container spec is a build, a
+run and an assertion about stdout. It exits `0` for passing, `1` for failing and `2` for "could not
+run here", which the caller must treat differently: a missing Docker on a reviewer's machine is not
+a failing implementation.
+
+Unit tests stay in `tests/`, mirroring `src/`. They answer "does this module work". A spec's own
+tests answer "is this spec satisfied". Two different questions.
 
 ## Why the commit order matters
 
@@ -25,54 +39,15 @@ changed the decision.
 
 ## Template
 
-```markdown
-# NNN — <title>
+`999-spec-template.md`. Copy it to `specs/NNN-<slug>/spec.md` and fill in `What I want`.
 
-Status: draft | active | done | superseded by NNN
-Covers: work-order step N in PLAN.md
+The shape in one paragraph: **you write prose, the tool writes structure.** `What I want` is yours —
+dated entries, appended, never edited once written, because that section is the record of what was
+decided and when. Everything below the generated marker is produced by `pnpm enrich` from those
+entries: the four-row summary a reader must read, the examples, the acceptance check. Anything
+`enrich` cannot derive comes back as an open question instead of being guessed at.
 
-## Goal
-
-One paragraph. What capability exists after this that did not before, and why it is next.
-
-## Done when
-
-Concrete and checkable. Files that exist, exports they carry, commands that run.
-
-- `src/...` exports `X`
-- `pnpm ...` prints ... / exits 0
-
-## Acceptance check
-
-The command a reader can run, and what it should produce. If a step cannot be checked by running
-something, say how it is verified instead — but prefer a command.
-
-## Decisions already made
-
-So the implementer does not re-make them. Cite ADRs and PLAN.md where they apply.
-
-- ...
-
-## Assumptions taken
-
-Open questions this spec had to answer without a stakeholder. State the question and the choice.
-These roll up into the README's assumptions section.
-
-- **Question:** ... **Assumption:** ... **Why:** ...
-
-## Out of scope
-
-What this step must _not_ do. Usually the more useful half — it is what stops an agent being
-helpful in an expensive direction.
-
-- ...
-
-## Amendments
-
-Appended as they happen, newest last. Each says what changed and what forced the change.
-
-- _(date)_ ...
-```
+The rules that make it work are in `.claude/rules/specs.md`.
 
 ## Just-in-time
 

@@ -33,16 +33,27 @@ reasoning trail as a side task; it falls out of working this way.
 
 ### The loop
 
-1. **Write the spec** — `specs/NNN-<slug>.md`, one work-order step from `PLAN.md`. See the template
-   in `specs/README.md`.
-2. **Commit the spec on its own** — `spec(scope): ...`. Before any implementation. This ordering is
-   the evidence; a spec committed alongside or after its code reads as reconstruction, and git
-   timestamps make that visible.
-3. **Implement it** — `feat(scope): ...`, referencing the spec.
-4. **When the spec turns out wrong, amend it in a separate commit, with the reason.** This is the
-   most valuable part of the trail and the easiest to skip. "Spec assumed X; the data has Y; revised
-   to Z" is a real decision under a real constraint. A spec that was never amended looks like a spec
-   written afterwards.
+1. **The operator writes `Read this first`** — one sentence plus four rows: `Check`, `Proves`,
+   `Numbers`, `Not this`. This is the record of what was decided and the only part a reader must
+   read. An agent never writes it; agents may only read and expand it. See the template in
+   `specs/999-spec-template.md`.
+2. **An agent expands the rest** — `Done when`, the examples, the acceptance check, the decisions.
+   That is how the decision gets carried out, not what was decided. Where expanding it would mean
+   inventing a threshold or a case, the question goes back to the operator instead.
+3. **Commit the spec on its own** — `spec(scope): ...`, once, when it is finished. Before any
+   implementation. This ordering is the evidence; a spec committed alongside or after its code reads
+   as reconstruction, and git timestamps make that visible. The rounds of questions and answers that
+   preceded it are not commits.
+4. **Implement it** — `feat(scope): ...`, referencing the spec. Split by logical change, not by
+   file. The convergence loop — check fails, agent fixes, check runs again — produces **no commits**;
+   an intermediate state is not a logical change and records only that something did not work yet.
+5. **When the spec turns out wrong, amend it in a separate commit, with the reason**, then fix the
+   code in another. This is the most valuable part of the trail and the easiest to skip. "Spec
+   assumed X; the data has Y; revised to Z" is a real decision under a real constraint. A spec that
+   was never amended looks like a spec written afterwards.
+
+The steady rhythm is two commits per spec, `spec(...)` then `feat(...)`, plus a `spec(...): revise`
+and a `fix(...)` each time reality contradicts it.
 
 ### Rules of the method
 
@@ -99,6 +110,9 @@ needs adding, add it and say you did — in the spec, as an amendment.
 - `spec(scope):` for a specification, `feat(scope):` / `fix(scope):` for the code satisfying it,
   `spec(scope): revise ...` for an amendment. Spec commits land before their implementations.
 - Never commit without an explicit instruction to commit.
+- **Commits go through the `git` agent.** A `PreToolUse` hook blocks `git add` and `git commit` for
+  everyone else, including the main session. Prepare the working tree, then delegate with a complete
+  commit plan; the agent may split it further but never consolidates it.
 - `git push --force-with-lease` on feature branches only.
 
 ## Subagents
@@ -108,8 +122,12 @@ needs adding, add it and say you did — in the spec, as an amendment.
 - Never design a workflow that requires agents to talk to each other. The main session mediates
   every exchange, and every hop costs tokens and loses information. Subagents are for parallel,
   independent work.
-- The dev and tester agents write files. Reviewer, qa and architect do not — a reviewer that writes
-  the fix stops being a second pair of eyes.
+- The dev and tester agents write files. Reviewer, qa, architect and spec-reviewer do not — a
+  reviewer that writes the fix stops being a second pair of eyes. The `git` agent writes nothing but
+  commits.
+- `spec-reviewer` judges a spec on falsifiability, traceability and scope. It cannot judge
+  traceability on its own, because it never sees the conversation — pass the record of what was
+  agreed in its prompt, or it will say so rather than guess.
 - Context they receive: this file and any rules without `paths` frontmatter load at session start;
   path-gated rules load when a matching file is read. Memory contents do not load — pass values
   explicitly in the prompt.

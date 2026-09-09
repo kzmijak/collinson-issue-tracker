@@ -5,47 +5,83 @@ paths:
 
 # Writing a Spec
 
-`CLAUDE.md` carries the method — spec before code, amendments in their own commit, just-in-time,
-falsifiable, scope discipline. This file carries the part that is not obvious from the method and
-that has already been got wrong once.
+`CLAUDE.md` carries the loop. This file carries the part that is not obvious from it, and that has
+already been got wrong more than once.
 
-## A spec is the closing artifact of a consultation
+## The operator writes prose; the tool writes structure
 
-It contains what the operator and the session actually agreed. No less, and emphatically no more.
+A spec has two halves, and the boundary is a marker in the file, not a convention.
 
-Not in a spec: invented acceptance checks, file layouts, field lists, script names, thresholds,
-error paths or out-of-scope items that never came up in the conversation. A spec built mostly from
-inference asks the operator to review the agent's invention wearing the costume of an agreed
-contract, which inverts the direction of the whole method.
+**`What I want` belongs to the operator.** Dated entries, appended, **never edited once written** —
+it is the record of what was decided and when. An agent may read it and expand it. An agent may
+never write in it, reword it, or tidy it. Two entries may share a date; order comes from position in
+the file. Distinct labels, always: two identical headings are an error.
 
-The test before writing: **for each line, name the exchange it came from.** A line you cannot trace
-is a question, not a decision.
+**Everything below the generated marker belongs to the tool.** The four-row summary, the examples,
+the acceptance check, the decisions, the scope boundary. This is how the decision gets carried out,
+not what was decided.
 
-## Cascade doubts, do not resolve them
+Collapsing the two is what produced specs full of thresholds and script names nobody had agreed to.
+The canonical split is `specify` above, `plan` below.
 
-A doubt held before writing, or discovered while writing, goes back to the operator **before the
-spec is finished**. In plain text, in one batch, each with a recommendation.
+## Cascade doubts, never resolve them
 
-`CLAUDE.md` says "surface gaps, do not invent through them". Surface means _to the operator_, not
-in prose after the fact.
+If expanding an entry would mean inventing a threshold, a case, an error path or a policy default,
+that is an **open question**, not a decision. It goes back to the operator — in plain text, in one
+batch, each with a recommendation attached. `CLAUDE.md` says "surface gaps, do not invent through
+them"; surface means _to the operator_, not in prose after the fact.
 
-`Assumptions taken` is for questions an absent stakeholder would have answered — the brief's own
-framing. It is not a place to record decisions the operator was available to make and was not
-asked. Nor is it a receipt for a choice already made unilaterally.
+Recommendations are wanted. Bare questions are not, and neither is skipping the question because the
+answer looks obvious.
 
-This applies to `PLAN.md` amendments too. Cutting scope to pay for new scope is the operator's call.
+There is no `Assumptions taken` section for an agent to fill with its own choices after the fact.
+Where a generated spec records an assumption, it is a **flag that a gap exists** — the operator then
+either accepts it or appends an entry that settles it. It is never a receipt.
 
-## Falsifiable, and only that
+## Examples, not descriptions
 
-The bar from `specs/README.md`: two people read the spec and the implementation and can disagree
-about whether it is satisfied. Below that bar the spec is decoration; above it, by adding detail
-nobody asked for, it is scope.
+The single rule that decides whether a spec is worth writing.
 
-Prefer an acceptance check that is a command with an expected result. When a step cannot be checked
-by running something, say how it is verified instead — and say that it cannot.
+A **description** says how the program behaves. An **example** gives an input and the expected
+result. A description can be satisfied several incompatible ways; an example can be satisfied one
+way, and it becomes the test without anyone re-deriving it.
+
+|             |                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| Description | "rejects malformed configuration"                                                         |
+| Example     | `GITHUB_REPO=a/b/c` → exits non-zero, stdout empty                                        |
+| Description | "capped exponential backoff"                                                              |
+| Example     | at interval 1000: failures wait 2000, 4000, 8000, 10000, 10000; a success returns to 1000 |
+
+Anywhere a spec can enumerate, it must. Where it genuinely cannot, say so — that is the honest signal
+a human has to look at the result rather than at a suite.
+
+## The four rows
+
+`Check`, `Proves`, `Numbers`, `Not this`. They are derived from the operator's prose and shown back
+for confirmation, because confirming a structured reading is easier than composing one.
+
+- **Check** — one runnable, deterministic command. Never the smoke run; that is read by a human and
+  cannot gate anything.
+- **Proves** — what passing demonstrates, **counted**. The body enumerates what the count claims, so
+  a drift between them surfaces as a mismatched number rather than passing silently.
+- **Numbers** — every threshold, interval and limit, with its value. This is the row that most needs
+  the operator's own hand: a threshold is a value judgment wearing the costume of a parameter, and no
+  measurement can validate it, because it defines what good means.
+- **Not this** — the scope boundary, named specifically. Usually the most useful row: it is what
+  stops an agent being helpful in an expensive direction.
+
+## The acceptance check is also the plan step
+
+`apply` runs it to decide whether there is anything to do: green means converged, red means work.
+That gives the check a second job, and one consequence. **A check only sees what someone
+enumerated.** A requirement no case covers is invisible — the check reports green with the hole still
+open, and the tooling then reports "nothing to apply" and is lying. Tightness stops being hygiene and
+becomes the condition for the tooling to mean anything.
 
 ## Amendments
 
-When reality contradicts the spec, amend it in its own commit and say what forced the change. A
-spec with no amendments reads as a spec written after the fact. This is the most valuable entry in
-the trail and the easiest to skip.
+Reality contradicting a spec is recorded by appending an entry to `What I want`, not by editing what
+is there. Then the generated half is regenerated and the code reconciled. There is no rollback step:
+withdrawing a decision is an entry saying so, which keeps the record of having been there — a
+reverting script would erase exactly the corner you wanted to remember.
