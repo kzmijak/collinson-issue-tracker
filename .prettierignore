@@ -3,6 +3,10 @@
 # them rewrites evidence that is supposed to stay byte-stable.
 specs/*/metrics/
 
+# Same reasoning for the spec itself: its generated half is written by `pnpm enrich` and the table
+# padding it emits varies per run, so format:check would go red on a file nobody is allowed to edit.
+specs/*/spec.md
+
 node_modules
 dist
 pnpm-lock.yaml
