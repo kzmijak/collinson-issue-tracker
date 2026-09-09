@@ -13,8 +13,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "tsx src/cli/test.ts",
+    "prototype-issues-reader": "tsx --env-file-if-exists=.env src/reader/main.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "enrich": "tsx --env-file-if-exists=.env src/cli/enrich.ts",
+    "apply": "tsx --env-file-if-exists=.env src/cli/apply.ts",
     "commit": "tsx --env-file-if-exists=.env src/cli/commit.ts",
     "verify": "tsx --env-file-if-exists=.env src/cli/verify.ts"
   },

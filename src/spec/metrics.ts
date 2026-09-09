@@ -1,6 +1,7 @@
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Finding } from './VerifyPrompt.js';
+import type { ImplementationPick } from './ApplyPrompt.js';
 import { slug } from '../llm/slug.js';
 import type { TokenUsage } from '../llm/Llm.js';
 
@@ -28,6 +29,29 @@ export interface Verification {
   specSha: string;
 }
 
+export interface Application {
+  at: string;
+  status: string;
+  /** How many implementer rounds were spent before the check settled one way or the other. */
+  rounds: number;
+  checkExitCode: number;
+  checkDurationMs: number;
+  converged: boolean;
+  summary: string | null;
+  files: string[];
+  picks: ImplementationPick[];
+  blocked: string | null;
+  effectiveTokens: number;
+  /** The ceiling the run was given, so an overshoot is visible rather than needing recomputing. */
+  effectiveTokenBudget: number;
+  withinBudget: boolean;
+  /** Raw counts, so the next run's budget comes from a measurement instead of arithmetic. */
+  usage: TokenUsage;
+  model: string;
+  /** The spec this implementation answers, so a later change to it is visible as a mismatch. */
+  specSha: string;
+}
+
 export interface CommitNote {
   at: string;
   sha: string;
@@ -52,6 +76,8 @@ export interface EnrichMetrics {
   fixedFrom?: string;
   /** Appended by `pnpm verify`, so one file carries the whole life of one enrichment. */
   verification?: Verification;
+  /** Appended by `pnpm apply`, so the implementation sits beside the spec that asked for it. */
+  application?: Application;
   /** Appended by `pnpm commit`, linking the enrichment to what carried it into history. */
   commits?: CommitNote[];
 }
