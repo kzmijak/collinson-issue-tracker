@@ -1,11 +1,26 @@
 import type { ThinkingConfig } from '@anthropic-ai/claude-agent-sdk';
 import type { Prompt } from './Prompt.js';
 
+/**
+ * What a call is doing while it is doing it. A run that edits files takes minutes, and a spinner
+ * that only counts seconds cannot answer the one question worth asking of it — whether it is
+ * working or stuck.
+ */
+export type Activity =
+  | { kind: 'text'; text: string }
+  | { kind: 'tool'; name: string; target: string }
+  | { kind: 'stage'; label: string };
+
+export interface PromptOptions {
+  fresh?: boolean;
+  /** Overrides the budget the client was built with, for a caller pacing itself across calls. */
+  taskBudgetTokens?: number;
+  thinking?: ThinkingConfig;
+  onActivity?: (activity: Activity) => void;
+}
+
 export interface Llm {
-  prompt<TOutput>(
-    prompt: Prompt<TOutput>,
-    options?: { fresh?: boolean; thinking?: ThinkingConfig },
-  ): Promise<TOutput>;
+  prompt<TOutput>(prompt: Prompt<TOutput>, options?: PromptOptions): Promise<TOutput>;
   updateSystemPrompt(data: SystemPromptData): void;
   readonly lastEffectiveTokens: number;
   readonly totalUsage: TokenUsage;

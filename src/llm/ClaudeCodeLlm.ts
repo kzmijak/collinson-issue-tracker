@@ -1,11 +1,6 @@
-import {
-  type EffortLevel,
-  Options,
-  query,
-  type ThinkingConfig,
-} from '@anthropic-ai/claude-agent-sdk';
+import { type EffortLevel, Options, query } from '@anthropic-ai/claude-agent-sdk';
 import { Prompt } from './Prompt.js';
-import type { Llm, SystemPromptData, TokenUsage } from './Llm.js';
+import type { Activity, Llm, PromptOptions, SystemPromptData, TokenUsage } from './Llm.js';
 
 export class QueryFailedError extends Error {
   constructor(
@@ -22,19 +17,39 @@ export class QueryFailedError extends Error {
 }
 
 export interface ClaudeCodeLlmProps {
-  tools?: string[];
+  /**
+   * `'all'` is Claude Code's whole inventory, for a call whose job is to do work rather than to
+   * answer a question. An explicit list narrows it. The default — omitted — is no tools at all,
+   * because a call that only returns JSON has nothing to do with them and walking the repo is what
+   * made the first measured runs an order of magnitude more expensive than the work needed.
+   */
+  tools?: string[] | 'all';
+  /** Denied even when `tools` allows them. Patterns like `Bash(git commit:*)` narrow one tool. */
+  denied?: string[];
+  /**
+   * How many assistant turns one call may take. The default suits a tool-less call, where the only
+   * reason to need a second turn is continuing a truncated answer. A call that edits files needs
+   * room to read, write and run, and runs out silently without it.
+   */
+  maxTurns?: number;
   effort?: EffortLevel;
   /** Hard stop. The query aborts with `error_max_budget_usd` and returns nothing usable. */
   maxBudgetUsd?: number;
   /** Advisory. The model is told what it has left and wraps up instead of being truncated. */
   taskBudgetTokens?: number;
+  /**
+   * Keeps Claude Code's own system prompt and appends the identity to it, instead of replacing it.
+   * A call that edits files needs the tool conventions that prompt carries; a call that only
+   * returns JSON does not, and is cheaper without them.
+   */
+  presetSystemPrompt?: boolean;
 }
 
 export class ClaudeCodeLlm implements Llm {
   private sessionId: string | null = null;
   private costMultiplier: number;
   private readonly model: string;
-  private readonly tools: string[];
+  private readonly tools: string[] | 'all';
   private systemPrompt = new SystemPrompt();
   private _totalUsage: TokenUsage = {
     inputTokens: 0,
@@ -49,6 +64,9 @@ export class ClaudeCodeLlm implements Llm {
     cacheCreationTokens: 0,
   };
 
+  private readonly presetSystemPrompt: boolean;
+  private readonly denied: string[];
+  private readonly maxTurns: number;
   private readonly effort?: EffortLevel;
   private readonly maxBudgetUsd?: number;
   private readonly taskBudgetTokens?: number;
@@ -57,6 +75,9 @@ export class ClaudeCodeLlm implements Llm {
     this.model = model;
     this.costMultiplier = MODEL_COST[model] ?? 1;
     this.tools = props.tools ?? [];
+    this.denied = props.denied ?? [];
+    this.presetSystemPrompt = props.presetSystemPrompt ?? false;
+    this.maxTurns = props.maxTurns ?? DEFAULT_MAX_TURNS;
     this.effort = props.effort;
     this.maxBudgetUsd = props.maxBudgetUsd;
     this.taskBudgetTokens = props.taskBudgetTokens;
@@ -85,10 +106,7 @@ export class ClaudeCodeLlm implements Llm {
     return { ...this._lastCallUsage };
   }
 
-  async prompt<TOutput>(
-    prompt: Prompt<TOutput>,
-    options: { fresh?: boolean; thinking?: ThinkingConfig } = {},
-  ): Promise<TOutput> {
+  async prompt<TOutput>(prompt: Prompt<TOutput>, options: PromptOptions = {}): Promise<TOutput> {
     this._lastCallUsage = {
       inputTokens: 0,
       outputTokens: 0,
@@ -98,7 +116,7 @@ export class ClaudeCodeLlm implements Llm {
     if (options.fresh) this.sessionId = null;
     const outputSpecification = (prompt.constructor as typeof Prompt).outputSpecification;
     this.updateSystemPrompt({ instructions: outputSpecification });
-    const response = await this.query(prompt.createMessage(), options.thinking);
+    const response = await this.query(prompt.createMessage(), options);
 
     return prompt.parseOutput(response);
   }
@@ -119,20 +137,27 @@ export class ClaudeCodeLlm implements Llm {
     }
   }
 
-  private async query(message: string, thinking?: ThinkingConfig): Promise<string> {
+  private async query(
+    message: string,
+    { thinking, onActivity, taskBudgetTokens }: PromptOptions,
+  ): Promise<string> {
+    const budget = taskBudgetTokens ?? this.taskBudgetTokens;
+
     const options: Options = {
       model: this.model,
       ...(this.effort !== undefined && { effort: this.effort }),
       ...(this.maxBudgetUsd !== undefined && { maxBudgetUsd: this.maxBudgetUsd }),
-      ...(this.taskBudgetTokens !== undefined && { taskBudget: { total: this.taskBudgetTokens } }),
-      allowedTools: this.tools,
-      disallowedTools: this.tools.length === 0 ? EVERY_TOOL : [],
+      ...(budget !== undefined && { taskBudget: { total: budget } }),
+      ...toolPolicy(this.tools, this.denied),
+      // No hooks and no project settings reach a query started here, so a guard configured in
+      // `.claude/` does not apply to it. Whatever must not happen is denied above or forbidden in
+      // the identity; there is no second line of defence.
       settingSources: [],
-      // Tools are blocked, so nothing can loop; this only has to leave room for a truncated
-      // response to be continued, which a limit of one refuses.
-      maxTurns: 4,
+      maxTurns: this.maxTurns,
       permissionMode: 'bypassPermissions',
-      systemPrompt: this.systemPrompt?.toString(),
+      systemPrompt: this.presetSystemPrompt
+        ? { type: 'preset', preset: 'claude_code', append: this.systemPrompt.toString() }
+        : this.systemPrompt.toString(),
       ...(this.sessionId && { resume: this.sessionId }),
       ...(thinking && { thinking }),
     };
@@ -140,6 +165,10 @@ export class ClaudeCodeLlm implements Llm {
     const q = query({ prompt: message, options });
 
     for await (const event of q) {
+      if (event.type === 'assistant' && onActivity) {
+        for (const activity of readActivities(event)) onActivity(activity);
+        continue;
+      }
       if (event.type !== 'result') continue;
 
       // Usage is recorded before the outcome is judged: a call that failed still spent tokens, and
@@ -154,6 +183,62 @@ export class ClaudeCodeLlm implements Llm {
 
     throw new Error('Stream ended without a result');
   }
+}
+
+/**
+ * The SDK streams every assistant turn, and the parts worth showing are its narration and the tool
+ * calls it is making. Read defensively: this is a wire shape, and a block it does not recognise is
+ * worth skipping rather than crashing a run that is otherwise going fine.
+ */
+function readActivities(event: unknown): Activity[] {
+  const content = (event as { message?: { content?: unknown } }).message?.content;
+  if (!Array.isArray(content)) return [];
+
+  const activities: Activity[] = [];
+
+  for (const block of content as {
+    type?: string;
+    text?: string;
+    name?: string;
+    input?: unknown;
+  }[]) {
+    if (block.type === 'text' && block.text?.trim()) {
+      activities.push({ kind: 'text', text: block.text.trim() });
+    }
+    if (block.type === 'tool_use' && block.name) {
+      activities.push({ kind: 'tool', name: block.name, target: toolTarget(block.input) });
+    }
+  }
+  return activities;
+}
+
+/** Whichever field names what the tool is acting on, since each tool spells it differently. */
+export function toolTarget(input: unknown): string {
+  const fields = input as Record<string, unknown> | null | undefined;
+  if (!fields) return '';
+
+  for (const key of ['file_path', 'command', 'pattern', 'path', 'notebook_path', 'url']) {
+    const value = fields[key];
+    if (typeof value === 'string' && value.trim()) return value.trim().replace(/\s+/g, ' ');
+  }
+  return '';
+}
+
+const DEFAULT_MAX_TURNS = 4;
+
+/**
+ * Three states, not two. `allowedTools: []` reads as "no restriction" to the SDK, so a call meant
+ * to have no tools has to spell out a denial of every tool by name, and an unrestricted one has to
+ * omit the allow list rather than pass it empty.
+ */
+export function toolPolicy(
+  tools: string[] | 'all',
+  denied: string[],
+): Pick<Options, 'allowedTools' | 'disallowedTools'> {
+  if (tools === 'all') return { disallowedTools: denied };
+  if (tools.length === 0) return { allowedTools: [], disallowedTools: EVERY_TOOL };
+
+  return { allowedTools: tools, disallowedTools: denied };
 }
 
 const EVERY_TOOL = [
@@ -174,7 +259,7 @@ const EVERY_TOOL = [
   'Write',
 ];
 
-const MODEL_COST: Record<string, number> = {
+export const MODEL_COST: Record<string, number> = {
   'claude-haiku-4-5': 1,
   'claude-sonnet-5': 2,
   'claude-sonnet-4-6': 3,
