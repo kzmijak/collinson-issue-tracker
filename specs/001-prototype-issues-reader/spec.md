@@ -1,7 +1,7 @@
 # NNN — Prototype Issues Reader
 
 Status: draft
-Covers: work-order step N in PLAN.md
+Covers: 0
 
 ## What I want
 
@@ -53,6 +53,27 @@ Includes a simplistic loading indicator at the bottom - . -> .. -> ... -> . (eas
 - The alteration is in place, not new lines.
 - If there was an error, write that in the same line as the Polling, and only remove it the next result is successful. 
 
+### 2026-09-09 — GitHub API Simulator
+
+- Extend the mock dataset to 20 entries 
+
+- Create a GitHub API Simulator service that starts with the dataset of 15 and then gets continuously expanded with another 5 as times goes on (1 every few seconds). 
+
+- Make sure that the API contract mirrors the on of the actual GitHub for plug&play swapping. 
+
+- The point is that Prototype Issues Reader cannot tell if it's real GitHub or the fake on, so it can be designed around it.
+
+- When testing, first spawn the simulator and then the poller, don't remember to close both the poller and the simulator when you're done testing.
+
+- You may use any lightweight node service engine, like express.
+
+### 2026-09-09 — GitHub API Simulator Clarifications
+
+- When no .env is set, the Prototype Issues Reader defaults to mock GitHub provider.
+
+- Prototype Issues Reader no longer has any awareness about the mocks plane. It is only interested in the API URL - and whether this one leads to the mock GitHub or real GitHub, it has no way and no interest in confirming. 
+
+- Only one mocking mechanism can exists at a time, so currently it is to be the GitHub API Simulator.
 
 <!-- Every later change is a new dated heading appended below this one. Never edit an entry that
      is already here: it is the record of what was decided and when. Two entries may share a
@@ -63,8 +84,8 @@ Includes a simplistic loading indicator at the bottom - . -> .. -> ... -> . (eas
 
 <!-- enrich:meta
 generated: 2026-09-09
-source-sha: 35d4bd43760c
-status: accepted
+source-sha: f89dfe782f8c
+status: rejected
 from: 2026-09-08 — Init
 from: 2026-09-08 — Specify the requirements
 from: 2026-09-08 — Specify the requirements 2.0
@@ -72,74 +93,85 @@ from: 2026-09-08 — Specify the requirements 3.0
 from: 2026-09-09 — Fake GitHub API
 from: 2026-09-09 — Fake GitHub API vs GitHub API switch
 from: 2026-09-09 — In-place status bar
+from: 2026-09-09 — GitHub API Simulator
+from: 2026-09-09 — GitHub API Simulator Clarifications
 file: specs/001-prototype-issues-reader/test.bash
 -->
 
 ## Read this first
 
-a long-running console process, started by pnpm prototype-issues-reader, polls a mocked GitHub issues API on a timer, appends each newly-seen open issue as its own stdout line, and maintains an in-place 'Polling' status bar at the bottom that shows errors inline until the next successful poll
+A long-running console poller prints active GitHub issues for a repo, appending new ones every interval, with an in-place backing-off status bar, backed by a swappable mock or real GitHub API reached through one URL env var.
 
 |              |     |
 | ------------ | --- |
 | **Check**    | bash specs/001-prototype-issues-reader/test.bash |
-| **Proves**   | the command starts, prints every open issue from the static mock dataset exactly once, never prints the closed issue, separates the issue log from the status bar with one blank line, redraws the status bar in place (via carriage return, never a fresh newline) cycling through the three dot-phases, shows an inline error marker during simulated failures that clears on the next success, and recovers from two consecutive mock failures only after a measurably backed-off delay — all within one run of the script |
-| **Numbers**  | poll interval under test-1s - indicator tick-1s - mock dataset size-3 issues - mock open issues-2 - mock closed issues-1 - observation window part1-8s - mock simulated failures-2 - min elapsed before recovery-2.5s - observation window part2-10s |
-| **Not this** | real GitHub network calls - persisted/disk state across restarts - issue pagination - rate-limit-specific handling beyond the generic exponential backoff - interactive mutation of mock data at runtime - asserting the exact wording of the inline error message beyond the literal substring 'Error' |
+| **Proves**   | Starting the simulator (default port, GITHUB_API_URL unset) then the reader shows exactly 13 active issues before the first growth tick, later growing to 18 as 5 arrive one every 3s, never removing a printed line, preserving order; the status bar is exactly one in-place 'Polling' line preceded by one blank line, its trailing bytes changing across two samples 3s apart; a dead-endpoint run keeps the reader alive for 5s showing 'Polling' plus an error indication and zero issue lines; a third run against an endpoint unreachable for 17s then online shows 3 consecutive error-gap growths (each >=1.4x prior) then a post-success gap <=1.5x the base poll interval. |
+| **Numbers**  | initial seed - 15 issues - initial active - 13 - final seed - 20 issues - final active - 18 - simulator growth interval - 3s - simulator default port - 4000 - reader default poll interval - 5000ms - test poll interval - 1000ms - backoff - doubles on error, resets on success - status dot cycle - . .. ... repeating - error-run dead endpoint - http://127.0.0.1:9999 - error-run observation window - 5s - backoff-run port - 4001 - backoff-run simulator delay - 17s - backoff sample interval - 250ms - backoff sample count - 90 - backoff growth threshold - 1.4x - backoff reset threshold - 1.5x base - backoff minimum error gaps required - 3 - initial-count check deadline - 2.5s (before first 3s growth tick) |
+| **Not this** | no interactive dataset mutation - no persistence to disk - no non-issue repo data - no real network calls in the test - no auth-flow testing beyond token being read from env - no exact backoff ratio assertion beyond the stated thresholds |
 
 ## Open questions
 
-- Should GITHUB_API_MODE default to 'mock' when unset, since the real client isn't built yet? Recommend yes — avoids silently trying to hit GitHub with no working live path.
+- Should GITHUB_API_URL also gate the token header format for a real GitHub call, or is that pure implementation detail deferred to a later spec? Recommend: defer, this spec only proves the mock path.
 
 ## Assumptions taken
 
 Gaps the enricher had to settle without the operator. Each is a flag, not a decision — read them
 and append an entry if any is wrong.
 
-- **Which PLAN.md work-order step does this spec cover?** PLAN.md was not made available to this enrichment pass, so no step number is asserted here rather than inventing one; the operator should fill in the 'Covers' line directly against their own PLAN.md
-- **Exact wording/placement of the inline error marker in the status line?** only the literal substring 'Error' is asserted, appearing before the first recovered issue line — the surrounding text (dots, punctuation) is left to the implementer since the operator specified placement ('same line') but not wording
-- **How is the blank-line separator represented now that the status bar no longer emits fresh lines?** one real \n-delimited blank line immediately precedes the first \n-terminated line that contains 'Polling' (i.e. the point where the process switches from line-based issue output to in-place status redraw); subsequent redraws reuse that same line via \r and add no further blank lines
+- **How long should the test wait for the 5 additional issues at 'a few seconds'?** 3s interval; test budgets 20s total wait for the 18th line
+- **What counts as repo root relative to the test script for invoking pnpm scripts?** two directories up from the test script
+- **How does the test tell processes apart in cleanup?** capture each PID at spawn and kill all in a trap on EXIT, guarding against unset vars
+- **How to make 'updated in place' falsifiable?** capture raw stdout, count \n-delimited '^Polling' lines: exactly 1
+- **How to make blank-line separation falsifiable?** assert the line immediately preceding '^Polling' is empty
+- **How to exercise the error path safely?** point GITHUB_API_URL at http://127.0.0.1:9999, observe 5s, assert Polling+error+zero issues, assert kill -0 succeeds at 5s
+- **How to check the initial-13 count without racing the first growth tick?** check the count exactly once at 2.5s after reader start (before the 3s growth tick), not via a multi-second polling loop, so a correct implementation cannot be caught mid-growth
+- **How to make backoff doubling and reset falsifiable given the 4s original delay produced too few error samples?** raise the backoff-run simulator delay to 17s so three consecutive doubling waits (1s,2s,4s cumulative ~7s) complete and error before the endpoint comes up, giving 4 error samples and 3 gaps to check growth on, each required >=1.4x prior for tolerance; the reset check compares only the first post-success gap to <=1.5x base, unaffected by the larger delay
+- **Should small deltas be filtered as noise?** no longer filtering any delta by size; every status-line change is treated as an event so a jittery near-zero implementation cannot hide behind a filter
+- **Reader line format?** '#<number> <title>', one per line — operator's prose explicitly declines to define this ('no format predefined, first proposition establishes convention'), so this is an assumption, not a settled decision
+- **Does 'active' mean issue.state === 'open'?** yes, taking issue.state === 'open' since GitHub's real shape uses open/closed and the fixture needs a concrete field
 
 ## Done when
 
-- bash specs/001-prototype-issues-reader/test.bash exits 0 and prints PASS
+- pnpm github-api-simulator starts an HTTP server on $PORT (default 4000) serving GET /repos/:owner/:repo/issues in GitHub's issue array shape, seeded with 15 issues growing to 20, one every 3s
+- pnpm prototype-issues-reader exits only on manual signal, prints active issues then polls, and running bash specs/001-prototype-issues-reader/test.bash exits 0
 
 ## Behaviour
 
-### initial display shows only active issues
+### initial display
 
 | input | expected |
 | ----- | -------- |
-| GITHUB_API_MODE=mock, mock dataset has 2 open issues and 1 closed issue, first poll fires | stdout contains a line for each open issue; the closed issue's title never appears |
+| reader started against simulator freshly seeded with 15 issues, checked at 2.5s (before 3s growth tick), GITHUB_API_URL unset | stdout contains exactly 13 issue lines |
 
-### append-only across repeated polls
-
-| input | expected |
-| ----- | -------- |
-| process left running across several poll cycles against the static mock dataset | each open issue's line appears exactly once in total output, never duplicated or reprinted |
-
-### status bar redraws in place, never as new lines
+### append-only growth
 
 | input | expected |
 | ----- | -------- |
-| process observed for several seconds | raw stdout contains at least one carriage return (\r) and the literal substrings 'Polling .', 'Polling ..', 'Polling ...' each appear somewhere in the byte stream; the literal word 'Loading' never appears |
+| simulator grows 15->20 over ~15s | 18 issue lines total, original 13 unchanged and in original order |
 
-### status bar separated from issue log by a blank line
-
-| input | expected |
-| ----- | -------- |
-| stdout split into lines on \n; process observed until the first line containing 'Polling' appears | the \n-delimited line immediately preceding the first line containing 'Polling' is empty |
-
-### inline error marker during failures, cleared on next success
+### status bar in-place
 
 | input | expected |
 | ----- | -------- |
-| GITHUB_MOCK_FAIL_COUNT=2, POLL_INTERVAL_SECONDS=1 | the literal substring 'Error' appears in stdout at a byte offset earlier than the first open issue line's byte offset |
+| reader running normally, raw output captured | exactly one \n-delimited 'Polling' line regardless of poll count, preceded by a blank line, trailing bytes differ across two 3s-apart samples |
 
-### exponential backoff recovers from consecutive mock errors
+### error surfacing without dying
 
 | input | expected |
 | ----- | -------- |
-| GITHUB_MOCK_FAIL_COUNT=2 (mock API simulates 2 consecutive failures before succeeding), POLL_INTERVAL_SECONDS=1 | the process does not crash or exit; the first open issue line appears only after at least 2.5s of wall-clock time have elapsed since start |
+| GITHUB_API_URL points at nothing listening | within 5s: 'Polling' plus error indication, zero issue lines, reader process alive (kill -0 succeeds) at the 5s mark |
+
+### backoff doubles then resets
+
+| input | expected |
+| ----- | -------- |
+| GITHUB_API_URL points at a port nothing listens on for 17s, then a simulator starts on that port | 3 consecutive error-state gaps each >=1.4x the prior, then the gap immediately after the first non-error sample is <=1.5x the base 1000ms poll interval |
+
+### provider switch is a single URL
+
+| input | expected |
+| ----- | -------- |
+| GITHUB_API_URL unset, simulator on default port 4000 | reader connects with no other config, produces the 13-then-18 sequence |
 
 ## Acceptance check
 
@@ -147,22 +179,20 @@ and append an entry if any is wrong.
 bash specs/001-prototype-issues-reader/test.bash
 ```
 
-exits 0 and prints PASS after confirming both open mock issues appear exactly once, the closed one never appears, a blank line separates the log from the status bar, the status bar redraws in place with all three dot-phases present and no literal 'Loading' text, an inline 'Error' marker precedes recovery during simulated failures, and recovery after two simulated mock-API failures is measurably delayed by backoff
+exit code 0; all background processes (main simulator, main reader, error-run reader, backoff-run reader, backoff-run simulator) are terminated by the script whether it passes or fails
 
 ## Decisions already made
 
-- **Env vars: GITHUB_TOKEN, GITHUB_REPO, POLL_INTERVAL_SECONDS, GITHUB_API_MODE ('mock'|'live')** — 2026-09-08 Specify the requirements 2.0 leaves envs unnamed and delegates the convention to the first proposal; 2026-09-09 Fake GitHub API vs switch requires an env-driven mock/live switch
-- **Issue line format: '#<number> <title>'** — 2026-09-08 Specify the requirements 2.0: 'no specific format predefined', first proposal establishes it
-- **Status bar prefix renamed 'Loading' -> 'Polling', ticks once per second cycling . -> .. -> ..., redrawn strictly in place via carriage return, never as a new stdout line** — 2026-09-09 In-place status bar explicitly overrides 2026-09-08 Specify the requirements 3.0's naming and line-per-tick reading: 'CHANGED FROM Loading' and 'The alteration is in place, not new lines'
-- **On a failed poll, the status bar's same line carries an inline error indicator (contains the literal word 'Error'); it is removed the moment the next poll succeeds** — 2026-09-09 In-place status bar: 'write that in the same line as the Polling, and only remove it the next result is successful'
-- **Mock dataset is 3 fixed issues: 2 open ('#1 Fix login bug', '#3 Add dark mode'), 1 closed ('#2 Update README'), hardcoded in source, not runtime-editable** — 2026-09-09 Fake GitHub API and Fake GitHub API vs switch: static dataset, code-time only
-- **Exponential backoff doubles the retry interval from POLL_INTERVAL_SECONDS on each consecutive polling error and resets on success** — 2026-09-08 Specify the requirements: 'Double the interval after each consecutive error, reset the counter on success' — a checked requirement, not merely declared
-- **A test-only env var GITHUB_MOCK_FAIL_COUNT controls how many consecutive simulated failures the mock API returns before succeeding, defaulting to 0 when unset** — no operator entry names this; needed to make backoff externally observable without touching real GitHub or the static dataset, per the operator's own rule that unnamed test mechanics are the enricher's to set
-- **Blank-line separation applies once, before the status bar's first rendered frame — not repeated per tick, since the bar is now a single in-place line** — 2026-09-08 Specify the requirements 3.0's separation rule still holds; 2026-09-09 In-place status bar changes only the redraw mechanism, not the separation
+- **Env vars: GITHUB_TOKEN, GITHUB_REPO, GITHUB_API_URL, POLL_INTERVAL_MS; simulator uses PORT** — 2026-09-08 3.0 and 2026-09-09 Clarifications leave naming to 'first proposition'
+- **GITHUB_API_URL defaults to http://localhost:4000 when unset** — 2026-09-09 Clarifications: 'no .env set -> defaults to mock GitHub provider'
+- **Status bar text is 'Polling' + N dots, one line, blank line above, error text appended until next success, updates via carriage-return rewrite** — 2026-09-09 In-place status bar entry
+- **Simulator started via pnpm github-api-simulator, serves GET /repos/:owner/:repo/issues** — 2026-09-09 GitHub API Simulator entry: contract mirrors actual GitHub
+- **Simulator fixed dataset: issues #1-20, #5 and #10 permanently closed, all others open; seeded #1-15 at start, appends #16-20 one every 3s** — 2026-09-09 Simulator entry requires 15-then-20 static dataset
 
 ## Out of scope
 
-- a runtime flag or command to change GITHUB_MOCK_FAIL_COUNT after the process has started
-- asserting the exact backoff multiplier sequence beyond a single minimum-elapsed-time check (a fixed 2.5s+ delay with no real doubling would also pass this check — a known, declared gap)
-- asserting the exact wording of the inline error text beyond the literal substring 'Error'
-- any status-bar content other than the three dot-phases and the optional inline error marker
+- persisting last-seen issue ID across restarts
+- real GitHub API integration test
+- concurrent multi-repo polling
+- a UI beyond plain stdout
+- asserting a precise backoff multiplier (exactly 2.0x) rather than growth-then-reset
