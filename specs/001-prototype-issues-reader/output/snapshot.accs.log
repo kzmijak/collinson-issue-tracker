@@ -1,0 +1,26 @@
+
+> collinson-issue-tracker@0.1.0 prototype-issues-reader /home/kacper/repos/collinson-issue-tracker
+> tsx --env-file-if-exists=.env src/issue-tracker/main.ts
+
+
+[2KPolling .[1A[0J#1 Poller crashes when GITHUB_REPO is missing
+#2 Add retry/backoff to the issues client
+#4 Document the mock GitHub API contract
+#5 Support pagination on /issues
+#6 Reader should ignore pull requests entirely
+#7 Investigate flaky proxy outage test
+#8 Add ETag support to reduce polling cost
+#9 Allow overriding POLL_INTERVAL_MS at runtime
+#10 Mock dataset should mirror real issue shape
+#11 Terminal output breaks when not a TTY
+#12 Add structured logging to the reader
+#13 Clarify GITHUB_API_BASE_URL default behaviour
+#14 Reader should print issues oldest first
+#15 Add a health check endpoint to the simulator
+#16 Growing dataset should stop at 20 issues
+#17 Backoff should reset immediately after success
+#18 Simulator should bind before the reader starts polling
+#19 Add unit tests for the issue diffing logic
+#20 Write the acceptance check for this spec
+
+[2KPolling .[2KPolling ..[2KPolling ...[2KPolling .[2KPolling ..[2KPolling ...[2KPolling .[2KPolling ..

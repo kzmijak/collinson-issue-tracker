@@ -1,0 +1,94 @@
+{
+  "at": "2026-09-11T17:01:19.514Z",
+  "durationMs": 119363,
+  "entry": "2026-09-09 — Optimistic Scenario Only",
+  "sourceSha": "d5f0adb4791b",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 13086,
+    "cacheReadTokens": 0,
+    "cacheCreationTokens": 31412
+  },
+  "effectiveTokens": 209490,
+  "outcome": "written",
+  "files": [
+    "specs/001-prototype-issues-reader/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 1,
+    "assumptions": 7,
+    "decisions": 9,
+    "behaviours": 8,
+    "cases": 9,
+    "doneWhen": 3,
+    "outOfScope": 7,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-11T17:09:29.625Z",
+    "verdict": "rejected",
+    "summary": "Fixed two real bugs in the reader/mock so the ACCS gets past 'tracker initial display' (a status-bar fragment was bleeding onto the same raw line as the batch's first issue, and two fixture titles accidentally contained the substring 'polling'), but the ACCS's append-only check is unconditionally broken by construction and cannot pass with any spec-compliant in-place status bar. All existing tests, typecheck, and lint pass.",
+    "mustFix": [
+      {
+        "area": "Method",
+        "quote": "SNAP_LINES=$(wc -l < \"$TRACKER_LOG\")\ncp \"$TRACKER_LOG\" \"${TRACKER_LOG}.snap\"",
+        "problem": "cp captures the full raw file including whatever unterminated status-bar fragment is mid-write at that instant (renderStatus() never emits a trailing newline). The later recheck extracts via `head -n \"$SNAP_LINES\"`, which by definition can never include bytes past the last complete line. These two extraction methods can never produce identical output as long as the tracker keeps an in-place (CR-redrawn, non-newline-terminated) status bar — which the spec explicitly requires — so this check fails on every run regardless of whether the tracker is actually append-only."
+      }
+    ],
+    "shouldFix": [],
+    "shouldKnow": [],
+    "fix": "accs",
+    "by": "implementer",
+    "effectiveTokens": 0,
+    "specSha": "61cc76173612"
+  },
+  "application": {
+    "at": "2026-09-11T17:09:29.625Z",
+    "status": "blocked",
+    "rounds": 1,
+    "checkExitCode": 1,
+    "checkDurationMs": 21349,
+    "converged": false,
+    "summary": "Fixed two real bugs in the reader/mock so the ACCS gets past 'tracker initial display' (a status-bar fragment was bleeding onto the same raw line as the batch's first issue, and two fixture titles accidentally contained the substring 'polling'), but the ACCS's append-only check is unconditionally broken by construction and cannot pass with any spec-compliant in-place status bar. All existing tests, typecheck, and lint pass.",
+    "files": [
+      "src/issue-tracker/terminal.ts",
+      "src/mock-github/dataset.ts"
+    ],
+    "picks": [
+      {
+        "decision": "how to keep raw-log issue lines free of the status fragment",
+        "chose": "prefix printIssueLines' redraw sequence with a real \\n so the prior in-flight status text is newline-terminated before the cursor-up erase runs",
+        "why": "a live terminal renders it identically (cursor-up cancels the added line advance) but a piped log now gets a genuine line break instead of merging 'Polling' text into the next issue's line"
+      },
+      {
+        "decision": "fixture titles #8 and #18 contained the literal word 'polling'",
+        "chose": "reworded them ('reduce request cost', 'starts fetching') since title text isn't spec-mandated",
+        "why": "the ACCS strips any raw line containing 'polling' case-insensitively, so those two issue numbers could never appear in its matcher regardless of tracker correctness"
+      }
+    ],
+    "findings": [
+      {
+        "area": "Method",
+        "quote": "SNAP_LINES=$(wc -l < \"$TRACKER_LOG\")\ncp \"$TRACKER_LOG\" \"${TRACKER_LOG}.snap\"",
+        "problem": "cp captures the full raw file including whatever unterminated status-bar fragment is mid-write at that instant (renderStatus() never emits a trailing newline). The later recheck extracts via `head -n \"$SNAP_LINES\"`, which by definition can never include bytes past the last complete line. These two extraction methods can never produce identical output as long as the tracker keeps an in-place (CR-redrawn, non-newline-terminated) status bar — which the spec explicitly requires — so this check fails on every run regardless of whether the tracker is actually append-only."
+      }
+    ],
+    "fix": "accs",
+    "blocked": "accs.bash's append-only step compares a `cp`-based raw snapshot (which always includes a trailing unterminated status fragment) against a `head -n`-based re-extraction (which can never include one), so it fails unconditionally against any implementation of the spec's required in-place status bar.",
+    "effectiveTokens": 675229.4,
+    "effectiveTokenBudget": 1200000,
+    "withinBudget": true,
+    "usage": {
+      "inputTokens": 500,
+      "outputTokens": 23786,
+      "cacheReadTokens": 1176722,
+      "cacheCreationTokens": 80410
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "61cc76173612"
+  }
+}

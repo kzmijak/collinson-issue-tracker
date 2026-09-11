@@ -29,31 +29,31 @@
     "files": 1
   },
   "verification": {
-    "at": "2026-09-11T15:19:13.893Z",
-    "verdict": "approved",
-    "summary": "The enriched spec and ACCS align with the man-made breakpoints and the script has real assertions with hard timeouts, so it can pass or fail meaningfully. A few coverage gaps and a fragile parsing step are worth tightening but don't block implementation.",
-    "mustFix": [],
-    "shouldFix": [
+    "at": "2026-09-11T16:45:12.143Z",
+    "verdict": "rejected",
+    "summary": "Fixed a real bug in src/mock-github/dataset.ts (growth interval was 4000ms, doubling the spec's required 10s fill time to 20s) and verified it with the existing unit suite; accs.bash itself still fails in this sandbox for reasons outside my write boundary (owner/repo URL construction and process cleanup), which I could not fix or route around.",
+    "mustFix": [
       {
         "area": "Method",
-        "quote": "read -r TOTAL1 OPEN_CNT1 CLOSED_CNT1 OPEN_LIST1 CLOSED_LIST1 <<< \"$(parse_json \"$HERE/first.json\" | tr '\\n' ' ')\"",
-        "problem": "If the open or closed list is empty, the space-joined fields shift and later assertions read the wrong values. Rare in a 15-issue seed but worth a null-guard."
+        "quote": "REPO=\"${GITHUB_REPO:-repo}\"",
+        "problem": "accs.bash treats GITHUB_REPO as a bare repo name and concatenates it after a separate GITHUB_OWNER, but the project's own established convention (config.ts, .env.example: 'Repo is an env var; ex. kzmijak/collinson-issue-tracker') is that GITHUB_REPO holds the combined 'owner/repo' string. In an environment where GITHUB_REPO=owner/repo (as this sandbox has ambiently), accs.bash builds /repos/owner/owner/repo/issues, so mock-github never answers and the whole run fails at 'mock boot' with a route that actually works fine."
       },
       {
         "area": "Coverage",
-        "quote": "It shows Polling (CHANGED FROM Loading) with dots altering between . and .. and ...",
-        "problem": "The 2026-09-09 requirement that the status bar sits below a blank-line separator from the issue list is never checked by accs.bash, so a tracker with no separation still passes."
-      }
-    ],
-    "shouldKnow": [
+        "quote": "for i in $(seq 1 10); do\n  if curl -s --max-time 5 -o \"$HERE/first.json\" -w '%{http_code}' \"$URL\" 2>/dev/null | grep -q '^2'; then",
+        "problem": "The boot-detection loop and the mock's growth timer both run off the same wall clock (MOCK_START), but the loop can legitimately eat up to 10s before the first successful curl on a loaded machine. If that happens, the growth window (now correctly 10s per spec) can already be exhausted by the time TOTAL1 is captured, so the later 'TOTAL2 > TOTAL1' assertion is structurally unsatisfiable even though the mock is growing exactly as specified."
+      },
       {
-        "area": "Coverage",
-        "quote": "closed issues required in seed dataset - at least 1",
-        "problem": "Only the seed's closed issue is guaranteed and checked; nothing forces the 5 dynamically-added issues to include a closed one, so the growth-phase active filter is only indirectly exercised via the same seed closed number."
+        "area": "Method",
+        "quote": "[ -n \"$MOCK_PID\" ] && kill \"$MOCK_PID\" >/dev/null 2>&1",
+        "problem": "kill only signals the top-level pnpm wrapper PID, not its sh -c tsx / node descendants, so a failed or interrupted run leaves live node processes holding write offsets into the recycled tracker.accs.log/mock.accs.log files. The next run's truncation of those same files then produces NUL-byte holes when the orphan next writes, breaking grep-based assertions for reasons unrelated to the tracker's actual output."
       }
     ],
+    "shouldFix": [],
+    "shouldKnow": [],
     "fix": "accs",
-    "effectiveTokens": 57377.7,
+    "by": "implementer",
+    "effectiveTokens": 0,
     "specSha": "9bad4efb4f7e"
   },
   "commits": [
@@ -62,5 +62,54 @@
       "sha": "a27ef63",
       "subject": "chore(reader): stop ignoring specs output, commit the 001-prototype-issues-reader run artefacts"
     }
-  ]
+  ],
+  "application": {
+    "at": "2026-09-11T16:45:12.143Z",
+    "status": "blocked",
+    "rounds": 1,
+    "checkExitCode": 1,
+    "checkDurationMs": 10079,
+    "converged": false,
+    "summary": "Fixed a real bug in src/mock-github/dataset.ts (growth interval was 4000ms, doubling the spec's required 10s fill time to 20s) and verified it with the existing unit suite; accs.bash itself still fails in this sandbox for reasons outside my write boundary (owner/repo URL construction and process cleanup), which I could not fix or route around.",
+    "files": [
+      "src/mock-github/dataset.ts"
+    ],
+    "picks": [
+      {
+        "decision": "GROWTH_INTERVAL_MS value to hit the spec's 10s fill target",
+        "chose": "2000ms per step (5 steps × 2000ms = 10000ms, matching 15→20 in 10s)",
+        "why": "the prior value of 4000ms took 20s to fill, directly contradicting the 2026-09-09 'Optimistic Scenario Only' requirement"
+      }
+    ],
+    "findings": [
+      {
+        "area": "Method",
+        "quote": "REPO=\"${GITHUB_REPO:-repo}\"",
+        "problem": "accs.bash treats GITHUB_REPO as a bare repo name and concatenates it after a separate GITHUB_OWNER, but the project's own established convention (config.ts, .env.example: 'Repo is an env var; ex. kzmijak/collinson-issue-tracker') is that GITHUB_REPO holds the combined 'owner/repo' string. In an environment where GITHUB_REPO=owner/repo (as this sandbox has ambiently), accs.bash builds /repos/owner/owner/repo/issues, so mock-github never answers and the whole run fails at 'mock boot' with a route that actually works fine."
+      },
+      {
+        "area": "Coverage",
+        "quote": "for i in $(seq 1 10); do\n  if curl -s --max-time 5 -o \"$HERE/first.json\" -w '%{http_code}' \"$URL\" 2>/dev/null | grep -q '^2'; then",
+        "problem": "The boot-detection loop and the mock's growth timer both run off the same wall clock (MOCK_START), but the loop can legitimately eat up to 10s before the first successful curl on a loaded machine. If that happens, the growth window (now correctly 10s per spec) can already be exhausted by the time TOTAL1 is captured, so the later 'TOTAL2 > TOTAL1' assertion is structurally unsatisfiable even though the mock is growing exactly as specified."
+      },
+      {
+        "area": "Method",
+        "quote": "[ -n \"$MOCK_PID\" ] && kill \"$MOCK_PID\" >/dev/null 2>&1",
+        "problem": "kill only signals the top-level pnpm wrapper PID, not its sh -c tsx / node descendants, so a failed or interrupted run leaves live node processes holding write offsets into the recycled tracker.accs.log/mock.accs.log files. The next run's truncation of those same files then produces NUL-byte holes when the orphan next writes, breaking grep-based assertions for reasons unrelated to the tracker's actual output."
+      }
+    ],
+    "fix": "accs",
+    "blocked": "accs.bash's owner/repo URL assembly conflicts with the project's own combined GITHUB_REPO convention, and its boot-detection loop shares a clock with the growth timer it's asserting against — both are bugs in accs.bash, which is outside my src/harness+src/mock-github+src/issue-tracker+tests write boundary.",
+    "effectiveTokens": 1121682.7,
+    "effectiveTokenBudget": 900000,
+    "withinBudget": false,
+    "usage": {
+      "inputTokens": 975,
+      "outputTokens": 30064,
+      "cacheReadTokens": 2447701,
+      "cacheCreationTokens": 131821
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "9bad4efb4f7e"
+  }
 }
