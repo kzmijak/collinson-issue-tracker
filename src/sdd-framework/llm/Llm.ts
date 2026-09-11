@@ -18,7 +18,21 @@ export interface PromptOptions {
   /** Overrides the budget the client was built with, for a caller pacing itself across calls. */
   taskBudgetTokens?: number;
   thinking?: ThinkingConfig;
+  /** Hard stop, in effective tokens: the call is aborted once its live meter passes this. */
+  maxEffectiveTokens?: number;
   onActivity?: (activity: Activity) => void;
+}
+
+/** A call aborted by its own `maxEffectiveTokens`. Nothing usable came back; the spend is real. */
+export class EffectiveTokenCeilingError extends Error {
+  constructor(
+    readonly limit: number,
+    readonly spent: number,
+  ) {
+    super(
+      `aborted at ${Math.round(spent).toLocaleString('en-US')} effective tokens, past the hard limit of ${limit.toLocaleString('en-US')}.`,
+    );
+  }
 }
 
 export interface Llm {

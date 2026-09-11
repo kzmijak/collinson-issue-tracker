@@ -1,6 +1,13 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { apply, type ApplyProps } from '../../../src/sdd-framework/spec/apply.js';
-import type { Llm, SystemPromptData, TokenUsage } from '../../../src/sdd-framework/llm/Llm.js';
+import {
+  EffectiveTokenCeilingError,
+  type Llm,
+  type SystemPromptData,
+  type TokenUsage,
+} from '../../../src/sdd-framework/llm/Llm.js';
 import { specFixture } from './specFixture.js';
 
 const props: ApplyProps = {
@@ -41,6 +48,32 @@ class AlwaysAnswers extends NeverCalled {
       summary: 'done',
       files: [],
       picks: [],
+      blocked: null,
+      remedy: null,
+    } as TOutput);
+  }
+}
+
+/** Runs past whatever hard limit it is given, as a runaway would. */
+class RunsAway extends NeverCalled {
+  limits: (number | undefined)[] = [];
+  prompt<TOutput>(_prompt?: unknown, options?: { maxEffectiveTokens?: number }): Promise<TOutput> {
+    this.calls += 1;
+    this.limits.push(options?.maxEffectiveTokens);
+    return Promise.reject(new EffectiveTokenCeilingError(options?.maxEffectiveTokens ?? 0, 1));
+  }
+}
+
+/** Sends the ACCS back, the way a verifier would. */
+class SendsBack extends NeverCalled {
+  prompt<TOutput>(): Promise<TOutput> {
+    this.calls += 1;
+    return Promise.resolve({
+      summary: 'the ACCS greps a log full of colour codes',
+      files: [],
+      picks: [],
+      findings: [{ area: 'Method', quote: null, problem: 'grep sees a binary file' }],
+      fix: 'accs',
       blocked: null,
       remedy: null,
     } as TOutput);
@@ -106,5 +139,36 @@ describe('apply', () => {
 
     expect(llm.calls).toBe(1);
     expect(result.status).toBe('not-converged');
+  });
+
+  it('sends the spec back like a verifier when the implementer rejects it', async () => {
+    const fixture = specFixture({ enriched: { status: 'approved' }, accsScript: 'exit 1' });
+    mkdirSync(join(fixture.output, 'metrics'), { recursive: true });
+    const record = join(fixture.output, 'metrics', '2026-09-11T00-00-00Z--x.json');
+    writeFileSync(record, '{}');
+
+    const result = await apply(fixture.path, new SendsBack(), { ...props, rounds: 1 });
+
+    const verification = JSON.parse(readFileSync(record, 'utf8')).verification;
+    expect(result.implementation?.fix).toBe('accs');
+    expect(readFileSync(join(fixture.output, 'enriched-spec.md'), 'utf8')).toContain(
+      'status: rejected',
+    );
+    expect(verification).toMatchObject({ verdict: 'rejected', fix: 'accs', by: 'implementer' });
+    expect(verification.mustFix[0].problem).toBe('grep sees a binary file');
+  });
+
+  it('stops at the hard limit, still judging the tree with the check', async () => {
+    const llm = new RunsAway();
+    const result = await apply(spec('approved'), llm, {
+      ...props,
+      rounds: 3,
+      hardEffectiveTokenLimit: 1_000_000,
+    });
+
+    expect(result.status).toBe('budget-exhausted');
+    expect(llm.calls).toBe(1);
+    expect(llm.limits).toEqual([1_000_000]);
+    expect(result.check?.exitCode).toBe(1);
   });
 });

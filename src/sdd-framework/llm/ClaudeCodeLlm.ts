@@ -1,6 +1,13 @@
 import { type EffortLevel, Options, query } from '@anthropic-ai/claude-agent-sdk';
 import { Prompt } from './Prompt.js';
-import type { Activity, Llm, PromptOptions, SystemPromptData, TokenUsage } from './Llm.js';
+import {
+  EffectiveTokenCeilingError,
+  type Activity,
+  type Llm,
+  type PromptOptions,
+  type SystemPromptData,
+  type TokenUsage,
+} from './Llm.js';
 import { effectiveTokens, LiveUsage } from './LiveUsage.js';
 
 export class QueryFailedError extends Error {
@@ -44,6 +51,8 @@ export interface ClaudeCodeLlmProps {
    * returns JSON does not, and is cheaper without them.
    */
   presetSystemPrompt?: boolean;
+  /** Replaces the inherited environment of the Claude Code process and every command it runs. */
+  env?: NodeJS.ProcessEnv;
 }
 
 export class ClaudeCodeLlm implements Llm {
@@ -72,6 +81,7 @@ export class ClaudeCodeLlm implements Llm {
   private readonly effort?: EffortLevel;
   private readonly maxBudgetUsd?: number;
   private readonly taskBudgetTokens?: number;
+  private readonly env?: NodeJS.ProcessEnv;
 
   constructor(model: string, identity: string, props: ClaudeCodeLlmProps = {}) {
     this.model = model;
@@ -83,14 +93,17 @@ export class ClaudeCodeLlm implements Llm {
     this.effort = props.effort;
     this.maxBudgetUsd = props.maxBudgetUsd;
     this.taskBudgetTokens = props.taskBudgetTokens;
+    this.env = props.env;
     this.updateSystemPrompt({ identity });
   }
 
   lastUsage: Record<string, unknown> | null = null;
+  /** What the live meter read when a call was aborted — no final usage ever arrives for it. */
+  private abortedAt = 0;
 
   get lastEffectiveTokens(): number {
     const u = this.lastUsage as Record<string, number | undefined> | null;
-    if (!u) return 0;
+    if (!u) return this.abortedAt;
     return effectiveTokens(
       {
         inputTokens: u.input_tokens ?? 0,
@@ -124,6 +137,7 @@ export class ClaudeCodeLlm implements Llm {
     };
     // A call that fails before the SDK reports usage must not inherit the previous call's figure.
     this.lastUsage = null;
+    this.abortedAt = 0;
     if (options.fresh) this.sessionId = null;
     const outputSpecification = (prompt.constructor as typeof Prompt).outputSpecification;
     this.updateSystemPrompt({ instructions: outputSpecification });
@@ -150,16 +164,19 @@ export class ClaudeCodeLlm implements Llm {
 
   private async query(
     message: string,
-    { thinking, onActivity, taskBudgetTokens }: PromptOptions,
+    { thinking, onActivity, taskBudgetTokens, maxEffectiveTokens }: PromptOptions,
   ): Promise<string> {
     const budget = taskBudgetTokens ?? this.taskBudgetTokens;
     const listener = onActivity ?? this.observer;
     const live = new LiveUsage(this.costMultiplier);
+    const metered = Boolean(listener) || maxEffectiveTokens !== undefined;
+    const abortController = new AbortController();
 
     const options: Options = {
       model: this.model,
       ...(this.effort !== undefined && { effort: this.effort }),
       ...(this.maxBudgetUsd !== undefined && { maxBudgetUsd: this.maxBudgetUsd }),
+      ...(this.env && { env: this.env }),
       ...(budget !== undefined && { taskBudget: { total: budget } }),
       ...toolPolicy(this.tools, this.denied),
       // No hooks and no project settings reach a query started here, so a guard configured in
@@ -173,15 +190,25 @@ export class ClaudeCodeLlm implements Llm {
         : this.systemPrompt.toString(),
       ...(this.sessionId && { resume: this.sessionId }),
       ...(thinking && { thinking }),
-      ...(listener && { includePartialMessages: true }),
+      ...(metered && { includePartialMessages: true }),
+      abortController,
     };
 
     const q = query({ prompt: message, options });
 
     for await (const event of q) {
       if (event.type === 'stream_event') {
-        const reading = listener ? live.read(event.event) : null;
+        const reading = metered ? live.read(event.event) : null;
         if (reading) listener?.({ kind: 'usage', ...reading, final: false });
+        if (
+          reading &&
+          maxEffectiveTokens !== undefined &&
+          reading.effectiveTokens > maxEffectiveTokens
+        ) {
+          this.abortedAt = reading.effectiveTokens;
+          abortController.abort();
+          throw new EffectiveTokenCeilingError(maxEffectiveTokens, reading.effectiveTokens);
+        }
         continue;
       }
       if (event.type === 'assistant' && listener) {

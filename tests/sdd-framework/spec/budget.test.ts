@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   budgetTokens,
-  WEIGHTED_ET_PER_OUTPUT_TOKEN,
+  WEIGHTED_ET_PER_BUDGET_TOKEN,
 } from '../../../src/sdd-framework/spec/budget.js';
 
 describe('budgetTokens', () => {
   it('converts an effective-token ceiling into the plain tokens taskBudget expects', () => {
     expect(budgetTokens(800_000, 'claude-sonnet-5')).toBe(
-      Math.floor(800_000 / (WEIGHTED_ET_PER_OUTPUT_TOKEN * 2)),
+      Math.floor(800_000 / (WEIGHTED_ET_PER_BUDGET_TOKEN * 2)),
     );
   });
 

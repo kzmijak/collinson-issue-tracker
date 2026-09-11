@@ -10,6 +10,7 @@ import { consoleLogger } from './consoleLogger.js';
 import { banner, brief, note, paragraph, section } from './report.js';
 import { style } from './format.js';
 import { startLive } from './live.js';
+import { agentEnv, checkEnv } from '../spec/agentEnv.js';
 
 /**
  * Sonnet, not opus: a specification this detailed asks for execution rather than invention, and the
@@ -20,6 +21,9 @@ import { startLive } from './live.js';
  * left into the plain-token advisory the model is actually given, so it paces itself and delivers a
  * complete smaller answer instead of being cut off mid-edit.
  *
+ * The advisory is only advice — one run went 25% over it — so a hard limit above it aborts the round
+ * outright, leaving whatever the tree holds for the check to judge.
+ *
  * `maxTurns` stays as the bound on a runaway that the budget cannot see: a loop with tools and no
  * ceiling has nothing to stop it.
  *
@@ -27,7 +31,8 @@ import { startLive } from './live.js';
  * `docs/apply-defaults.md`; `--rounds` and `--budget` override the two most likely to be wrong.
  */
 const MODEL = 'claude-sonnet-5';
-const EFFECTIVE_TOKEN_BUDGET = 900_000;
+const EFFECTIVE_TOKEN_BUDGET = 1_200_000;
+const HARD_EFFECTIVE_TOKEN_LIMIT = 1_500_000;
 const TIME_LIMIT_MS = 30 * 60_000;
 const MAX_TURNS = 200;
 const ROUNDS = 3;
@@ -38,6 +43,8 @@ const CHECK_TIMEOUT_MS = 300_000;
  * `settingSources: []` also keeps out the `PreToolUse` hook that normally guarantees history only
  * moves through `pnpm commit`, and this is the only mechanical barrier left. The identity carries
  * the rule itself, because a pattern list cannot anticipate every spelling of it.
+ *
+ * The environment comes from `.env.example`, not `.env` — see `spec/agentEnv.ts`.
  *
  * specs/ is the operator's and the enrichment's, never the implementer's: one run added a file
  * there to make the ACCS pass. .env holds live tokens: one run printed it into its transcript.
@@ -70,11 +77,12 @@ async function main(): Promise<number> {
   const force = args.includes('--force');
   const rounds = numberFlag(args, '--rounds') ?? ROUNDS;
   const budget = numberFlag(args, '--budget') ?? EFFECTIVE_TOKEN_BUDGET;
-  const spec = positional(args, ['--rounds', '--budget']);
+  const limit = Math.max(numberFlag(args, '--limit') ?? HARD_EFFECTIVE_TOKEN_LIMIT, budget);
+  const spec = positional(args, ['--rounds', '--budget', '--limit']);
 
   if (!spec) {
     consoleLogger.error(
-      'usage: pnpm apply <spec> [--rounds N] [--budget EFFECTIVE_TOKENS] [--force]',
+      'usage: pnpm apply <spec> [--rounds N] [--budget EFFECTIVE_TOKENS] [--limit EFFECTIVE_TOKENS] [--force]',
     );
     return 1;
   }
@@ -85,11 +93,12 @@ async function main(): Promise<number> {
     denied: DENIED,
     maxTurns: MAX_TURNS,
     presetSystemPrompt: true,
+    env: agentEnv(),
   });
   llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });
   consoleLogger.info(
     style(
-      `${MODEL} · ceiling ${budget.toLocaleString('en-US')} effective tokens · up to ${rounds} rounds`,
+      `${MODEL} · budget ${budget.toLocaleString('en-US')} · hard limit ${limit.toLocaleString('en-US')} effective tokens · up to ${rounds} rounds`,
       'dim',
     ),
   );
@@ -98,10 +107,12 @@ async function main(): Promise<number> {
   const result = await apply(path, llm, {
     model: MODEL,
     effectiveTokenBudget: budget,
+    hardEffectiveTokenLimit: limit,
     rounds,
     checkTimeoutMs: CHECK_TIMEOUT_MS,
     timeLimitMs: TIME_LIMIT_MS,
     force,
+    checkEnv: checkEnv(),
     onActivity: live.activity,
   }).finally(live.stop);
 
@@ -124,7 +135,7 @@ function report(result: ApplyResult, spec: string, budget: number): number {
 
   const converged = result.status === 'converged';
   const spent = Math.round(result.effectiveTokens);
-  const over = spent > budget ? ', over the ceiling' : '';
+  const over = spent > budget ? ', over the budget' : '';
 
   banner(
     converged ? 'CONVERGED' : result.status === 'blocked' ? 'BLOCKED' : 'NOT CONVERGED',
@@ -148,7 +159,11 @@ function report(result: ApplyResult, spec: string, budget: number): number {
   if (result.status === 'budget-exhausted') {
     section(
       'Why it stopped',
-      [{ body: 'The ceiling ran out before the check went green. Raise it with `--budget`.' }],
+      [
+        {
+          body: 'The budget ran out before the check went green. Raise it with `--budget` or `--limit`.',
+        },
+      ],
       'x',
       'red',
     );
@@ -182,10 +197,29 @@ function report(result: ApplyResult, spec: string, budget: number): number {
 
   section(
     'Bugs and loopholes in the spec or the ACCS',
-    (result.implementation?.specIssues ?? []).map((issue) => ({ body: issue })),
+    (result.implementation?.findings ?? []).map((finding) => ({
+      body: `**${finding.area}** ${finding.problem}`,
+    })),
     '!',
     'red',
   );
+
+  const fix = result.implementation?.fix ?? 'none';
+  if (fix !== 'none') {
+    section(
+      'Sent back',
+      [
+        {
+          body:
+            fix === 'accs'
+              ? 'The implementer rejected the ACCS. Run `pnpm enrich --accs`, then `pnpm verify`.'
+              : 'The implementer rejected the enriched spec. Run `pnpm enrich`, then `pnpm verify`.',
+        },
+      ],
+      'x',
+      'red',
+    );
+  }
 
   if (!converged && result.check) showOutput(result.check.output);
 

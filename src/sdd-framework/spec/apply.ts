@@ -1,5 +1,11 @@
 import { existsSync } from 'node:fs';
-import type { Activity, Llm, TokenUsage } from '../llm/Llm.js';
+import { writeFile } from 'node:fs/promises';
+import {
+  EffectiveTokenCeilingError,
+  type Activity,
+  type Llm,
+  type TokenUsage,
+} from '../llm/Llm.js';
 import { budgetTokens, MIN_ROUND_EFFECTIVE_TOKENS } from './budget.js';
 import { readAgentPrompt } from './agentPrompt.js';
 import { ApplyPrompt, ReapplyPrompt } from './ApplyPrompt.js';
@@ -8,7 +14,8 @@ import { readKnowledgeBase } from './knowledgeBase.js';
 import { amendMetrics } from './metrics.js';
 import { readArtefacts } from './readArtefacts.js';
 import { runCheck, type CheckResult } from './runCheck.js';
-import { readStatus, specSha } from './SpecFile.js';
+import { readStatus, setStatus, specSha } from './SpecFile.js';
+import { readPreviousFiles } from './specFiles.js';
 import { describeSpec, isStale, readSpecFolder } from './specFolder.js';
 import { applyReport, writeReport } from './reports.js';
 import { specName } from './resolveSpecPath.js';
@@ -28,11 +35,15 @@ export interface ApplyProps {
   model: string;
   /** The ceiling for the whole run, in effective tokens. Rounds share it; they do not each get it. */
   effectiveTokenBudget: number;
+  /** Hard stop for the whole run, in effective tokens: a round that passes it is aborted. */
+  hardEffectiveTokenLimit?: number;
   rounds: number;
   checkTimeoutMs: number;
   /** No new round starts after this; a round already running is never cut off, so its spend is still counted. */
   timeLimitMs: number;
   force: boolean;
+  /** What the acceptance check runs with — the same environment the implementer had. */
+  checkEnv?: NodeJS.ProcessEnv;
   /** Reports as the run goes, so minutes of silence are not the only feedback available. */
   onActivity?: (activity: Activity) => void;
 }
@@ -82,14 +93,14 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
   const stage = (label: string) => props.onActivity?.({ kind: 'stage', label });
 
   stage('running the check to see whether there is anything to do');
-  const before = await runCheck(script, props.checkTimeoutMs);
+  const before = await runCheck(script, props.checkTimeoutMs, props.checkEnv);
 
   if (before.exitCode === 0) {
     return { ...empty(), status: 'nothing-to-do', check: before };
   }
 
   const instructions = readAgentPrompt(IMPLEMENTER_DEFINITION, { without: ['Output format'] });
-  const artefacts = await readArtefacts(output);
+  const artefacts = await readArtefacts(output, readPreviousFiles(folder.enriched));
   const knowledge = await readKnowledgeBase();
 
   let check = before;
@@ -129,17 +140,29 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     stage(
       `round ${round} of ${props.rounds} — implementing, ${Math.round(remaining).toLocaleString('en-US')} effective tokens left`,
     );
-    implementation = await llm.prompt(prompt, {
-      fresh: round === 1,
-      onActivity: props.onActivity,
-      taskBudgetTokens: allowance,
-    });
+    try {
+      implementation = await llm.prompt(prompt, {
+        fresh: round === 1,
+        onActivity: props.onActivity,
+        taskBudgetTokens: allowance,
+        ...(props.hardEffectiveTokenLimit !== undefined && {
+          maxEffectiveTokens: props.hardEffectiveTokenLimit - effectiveTokens,
+        }),
+      });
+    } catch (error) {
+      if (!(error instanceof EffectiveTokenCeilingError)) throw error;
+      effectiveTokens += llm.lastEffectiveTokens;
+      exhausted = true;
+      stage(`round ${round} — aborted at the hard limit, running the check`);
+      check = await runCheck(script, props.checkTimeoutMs, props.checkEnv);
+      break;
+    }
     effectiveTokens += llm.lastEffectiveTokens;
 
     if (implementation.blocked) break;
 
     stage(`round ${round} — running the check`);
-    check = await runCheck(script, props.checkTimeoutMs);
+    check = await runCheck(script, props.checkTimeoutMs, props.checkEnv);
     stage(
       check.exitCode === 0
         ? `check passed in ${Math.round(check.durationMs / 1000)}s`
@@ -154,7 +177,29 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     : outOfTime
       ? 'time-exhausted'
       : settle(implementation, check);
+  const sha = specSha(folder.operatorSection, folder.accs, folder.enriched, artefacts);
+  const sentBack = (implementation?.fix ?? 'none') !== 'none' ? implementation : null;
+
+  // Sent back the way a verifier would send it: the enrichment reads the findings, the loop reads
+  // the range of fire, and apply refuses the spec until it has been enriched and approved again.
+  if (sentBack) {
+    await writeFile(folder.paths.enriched, setStatus(folder.enriched, 'rejected'), 'utf8');
+  }
   const attachedTo = await amendMetrics(output, {
+    ...(sentBack && {
+      verification: {
+        at: new Date().toISOString(),
+        verdict: 'rejected',
+        summary: sentBack.summary,
+        mustFix: sentBack.findings,
+        shouldFix: [],
+        shouldKnow: [],
+        fix: sentBack.fix === 'accs' ? 'accs' : 'full',
+        by: 'implementer',
+        effectiveTokens: 0,
+        specSha: sha,
+      },
+    }),
     application: {
       at: new Date().toISOString(),
       status,
@@ -165,14 +210,15 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
       summary: implementation?.summary ?? null,
       files: implementation?.files ?? [],
       picks: implementation?.picks ?? [],
-      specIssues: implementation?.specIssues ?? [],
+      findings: implementation?.findings ?? [],
+      fix: implementation?.fix ?? 'none',
       blocked: implementation?.blocked ?? null,
       effectiveTokens,
       effectiveTokenBudget: props.effectiveTokenBudget,
       withinBudget: effectiveTokens <= props.effectiveTokenBudget,
       usage: llm.totalUsage,
       model: props.model,
-      specSha: specSha(folder.operatorSection, folder.accs, folder.enriched, artefacts),
+      specSha: sha,
     },
   });
 
