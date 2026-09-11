@@ -1,6 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { Llm } from '../llm/Llm.js';
-import { amendMetrics, latestMetricsPath, type EnrichMetrics } from './metrics.js';
+import {
+  amendMetrics,
+  latestMetricsPath,
+  readPreviousVerdict,
+  type EnrichMetrics,
+} from './metrics.js';
 import { readArtefacts } from './readArtefacts.js';
 import { VerifyPrompt } from './VerifyPrompt.js';
 import type { Verdict } from './schemas/Verdict.js';
@@ -54,7 +59,9 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
   }
 
   try {
-    const verdict = await llm.prompt(new VerifyPrompt(describeSpec(folder), artefacts), {
+    const previous = await readPreviousVerdict(output);
+    const rejection = previous?.verdict === 'rejected' ? previous : null;
+    const verdict = await llm.prompt(new VerifyPrompt(describeSpec(folder), artefacts, rejection), {
       fresh: true,
     });
     const effectiveTokens = llm.lastEffectiveTokens;

@@ -87,4 +87,26 @@ describe('VerifyPrompt', () => {
   it('says what to do, since the identity carries the rules but not the task', () => {
     expect(prompt.createMessage()).toContain('## Your task');
   });
+
+  it('shows the previous rejection and asks for it to be checked first', () => {
+    const message = new VerifyPrompt('spec', 'files', {
+      at: '2026-09-11T00:00:00Z',
+      verdict: 'rejected',
+      summary: 'the ACCS never reads the mock console',
+      mustFix: [{ area: 'Coverage', quote: null, problem: 'no stdout check' }],
+      shouldFix: [],
+      shouldKnow: [],
+      fix: 'accs',
+      effectiveTokens: 0,
+      specSha: 'x',
+    }).createMessage();
+
+    expect(message).toContain('## The previous verdict (verifier, rejected)');
+    expect(message).toContain('- [Coverage] no stdout check');
+    expect(message).toContain('each finding of the previous verdict was fixed');
+  });
+
+  it('asks nothing about a previous verdict when there is none', () => {
+    expect(prompt.createMessage()).not.toContain('previous verdict');
+  });
 });

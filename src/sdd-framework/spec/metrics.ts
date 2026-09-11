@@ -162,3 +162,21 @@ export async function readLastVerification(outputDir: string): Promise<Verificat
   const record = JSON.parse(await readFile(path, 'utf8')) as EnrichMetrics;
   return record.verification ?? null;
 }
+
+/**
+ * The latest verdict on record, however many runs back. An ACCS fix writes a record of its own with
+ * no verdict in it, so the latest record alone would lose the verdict that fix answered.
+ */
+export async function readPreviousVerdict(outputDir: string): Promise<Verification | null> {
+  const dir = join(outputDir, METRICS_DIR);
+  const names = await readdir(dir).catch(() => [] as string[]);
+
+  for (const name of names
+    .filter((file) => file.endsWith('.json'))
+    .sort()
+    .reverse()) {
+    const record = JSON.parse(await readFile(join(dir, name), 'utf8')) as EnrichMetrics;
+    if (record.verification) return record.verification;
+  }
+  return null;
+}
