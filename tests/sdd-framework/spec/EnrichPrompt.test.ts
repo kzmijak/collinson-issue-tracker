@@ -17,7 +17,10 @@ const body = {
   files: [{ path: 'accs.bash', content: 'exit 0' }],
 };
 
-const prompt = new EnrichPrompt('## What I want\n\n### 2026-09-09 — x\n\nprose');
+const prompt = new EnrichPrompt(
+  '## What I want\n\n### 2026-09-09 — x\n\nprose',
+  'Start it and curl it.',
+);
 
 describe('EnrichPrompt', () => {
   it('keeps a single genuine blocker as blocking', () => {
@@ -44,5 +47,13 @@ describe('EnrichPrompt', () => {
 
   it('refuses output that does not match the contract', () => {
     expect(() => prompt.parseOutput('{"blocking":[]}')).toThrow(ModelContractError);
+  });
+
+  it("hands the enricher the operator's accs.md alongside spec.md", () => {
+    const message = prompt.createMessage();
+
+    expect(message).toContain('### 2026-09-09 — x');
+    expect(message).toContain('## accs.md');
+    expect(message).toContain('Start it and curl it.');
   });
 });

@@ -1,13 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import type { Llm } from '../llm/Llm.js';
-import { readAgentPrompt } from './agentPrompt.js';
 import { latestMetricsPath, writeMetrics, type EnrichMetrics } from './metrics.js';
-import { readEntries, setStatus, splitSpec } from './SpecFile.js';
-import { AccsCorrectionPrompt } from './AccsCorrectionPrompt.js';
-import { ACCS_SCRIPT, writeGeneratedFiles } from './specFiles.js';
-
-export const ENRICHER_DEFINITION = '.ai/identities/enricher.md';
+import { readEntries, setStatus } from './SpecFile.js';
+import { isStale, readSpecFolder, withoutMeta } from './specFolder.js';
+import { AccsCorrectionPrompt } from './AccsPrompt.js';
+import { writeGeneratedFiles } from './specFiles.js';
 
 export type EnrichAccsStatus = 'written' | 'nothing-to-fix' | 'refused';
 
@@ -24,22 +21,24 @@ export interface EnrichAccsContext {
 }
 
 /**
- * `pnpm enrich --accs` is a narrower repair than `pnpm enrich`: it exists because the ordinary
- * correction round regenerates the whole generated half from a verdict that was only ever about
- * the check, at full cost and at the risk of drifting prose a reviewer already read and approved.
- * This one touches accs.bash and nothing else the operator or a reviewer has seen before.
+ * `pnpm enrich --accs` is a narrower repair than `pnpm enrich`: when the verdict was only about the
+ * ACCS, regenerating the enriched spec too costs a full run and risks drifting prose a reviewer
+ * already approved. This one rewrites the ACCS from what is there and touches nothing else.
  */
 export async function enrichAccs(
   path: string,
   llm: Llm,
   context: EnrichAccsContext,
 ): Promise<EnrichAccsResult> {
-  const specDir = dirname(path);
   const startedAt = Date.now();
-  const source = await readFile(path, 'utf8');
-  const { head, generated } = splitSpec(source);
+  const folder = await readSpecFolder(path);
+  const { output } = folder.paths;
 
-  const metricsPath = await latestMetricsPath(specDir);
+  if (isStale(folder)) {
+    return refused('spec.md or accs.md changed since the last enrichment — run `pnpm enrich`.');
+  }
+
+  const metricsPath = await latestMetricsPath(output);
   if (!metricsPath) {
     return refused('no enrichment record for this spec — run `pnpm enrich` first.');
   }
@@ -52,28 +51,29 @@ export async function enrichAccs(
     return { status: 'nothing-to-fix', files: [], effectiveTokens: 0 };
   }
 
-  const scriptPath = join(specDir, ACCS_SCRIPT);
+  const scriptPath = folder.paths.accsScript;
   const currentScript = await readFile(scriptPath, 'utf8').catch(() => null);
   if (currentScript === null) {
     return refused(`${scriptPath} does not exist yet — run \`pnpm enrich\` first.`);
   }
 
-  const instructions = readAgentPrompt(ENRICHER_DEFINITION);
-  const specBody = stripMeta(generated);
-
   const correction = await llm.prompt(
-    new AccsCorrectionPrompt(instructions, specBody, currentScript, ACCS_SCRIPT, verification),
+    new AccsCorrectionPrompt(
+      { accs: folder.accs, enrichedSpec: withoutMeta(folder.enriched), accsPath: scriptPath },
+      currentScript,
+      verification,
+    ),
     { fresh: true },
   );
   const effectiveTokens = llm.lastEffectiveTokens;
 
-  const files = await writeGeneratedFiles(specDir, correction.files);
-  await writeFile(path, setStatus(source, 'draft'), 'utf8');
+  const files = await writeGeneratedFiles(output, correction.files);
+  await writeFile(folder.paths.enriched, setStatus(folder.enriched, 'draft'), 'utf8');
 
-  await writeMetrics(specDir, {
+  await writeMetrics(output, {
     at: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
-    entry: `${readEntries(head).at(-1) ?? 'no-entry'} — accs correction`,
+    entry: `${readEntries(folder.operatorSection).at(-1) ?? 'no-entry'} — accs correction`,
     sourceSha: record.sourceSha,
     model: context.model,
     taskBudgetTokens: context.taskBudgetTokens,
@@ -85,11 +85,6 @@ export async function enrichAccs(
   });
 
   return { status: 'written', files, effectiveTokens };
-}
-
-/** The meta comment is bookkeeping for the tool, not part of what the check has to prove. */
-function stripMeta(generated: string): string {
-  return generated.replace(/<!-- enrich:meta[\s\S]*?-->\s*/, '').trim();
 }
 
 function refused(detail: string): EnrichAccsResult {

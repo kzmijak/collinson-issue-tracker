@@ -17,7 +17,6 @@ const body: EnrichedBody = {
   outOfScope: ['pagination'],
   openQuestions: ['Is the token mandatory? Recommendation: yes.'],
   assumptions: [{ question: 'Sort order?', choice: 'API order — the operator named none.' }],
-  files: [{ path: 'accs.bash', content: '#!/usr/bin/env bash\nexit 0', executable: true }],
 };
 
 const meta = {

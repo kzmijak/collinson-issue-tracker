@@ -1,31 +1,20 @@
-import { PROJECT_CONTEXT, readAgentPrompt } from '../spec/agentPrompt.js';
 import { enrich } from '../spec/enrich.js';
-import { ENRICHER_DEFINITION, enrichAccs } from '../spec/enrichAccs.js';
-import { ClaudeCodeLlm, QueryFailedError } from '../llm/ClaudeCodeLlm.js';
+import { enrichAccs } from '../spec/enrichAccs.js';
+import { type ClaudeCodeLlm, QueryFailedError } from '../llm/ClaudeCodeLlm.js';
+import {
+  accsAuthorBorrowsIdentity,
+  ACCS_AUTHOR_DEFINITION,
+  createAccsAuthor,
+  createEnricher,
+  ENRICH_TASK_BUDGET_TOKENS,
+  SPEC_MODEL,
+} from './agents.js';
 import { ModelContractError, type EnrichMode } from '../spec/EnrichPrompt.js';
-import { resolveSpecPath, SpecNotFoundError } from '../spec/resolveSpecPath.js';
+import { resolveSpecPath, SpecNotFoundError, specName } from '../spec/resolveSpecPath.js';
 import { SpecFormatError } from '../spec/SpecFile.js';
 import { consoleLogger } from './consoleLogger.js';
 import { banner, note, paragraph, section } from './report.js';
 import { startProgress } from './progress.js';
-
-/**
- * What the model is told it has, so it paces itself and wraps up instead of being truncated at the
- * output ceiling. Output carries a ×10 weight for sonnet-5 in effective tokens, so 45,000 tokens
- * plus the cache overhead measured in `docs/enrich-cost-measurements.md` lands under 200,000 ET.
- *
- * No `maxBudgetUsd`: a hard abort returns nothing usable, so it buys a cheaper failure rather than
- * a cheaper success. Left unset deliberately.
- */
-const TASK_BUDGET_TOKENS = 45_000;
-
-/**
- * The enricher's whole discipline — decide-record-hand-back, examples not descriptions, expand
- * what is there and never add capability, the black-box rule, the register — lives in this file.
- * A one-line identity was standing in for it until now, silently, with none of that reaching the
- * model that writes the check.
- */
-const IDENTITY = readAgentPrompt(ENRICHER_DEFINITION);
 
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
@@ -40,25 +29,36 @@ async function main(): Promise<number> {
   }
 
   const path = resolveSpecPath(target);
-  const model = 'claude-sonnet-5';
+  const model = SPEC_MODEL;
+  if (accsAuthorBorrowsIdentity()) {
+    note(
+      `${ACCS_AUTHOR_DEFINITION} does not exist yet — the ACCS author borrows the enricher's identity.`,
+    );
+  }
 
   if (accsOnly) return runAccsOnly(path, model, target);
 
-  const llm = new ClaudeCodeLlm(model, IDENTITY, { taskBudgetTokens: TASK_BUDGET_TOKENS });
-  llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });
-  const progress = startProgress(`enriching ${path}`);
-  const result = await enrich(path, llm, mode, {
+  const enricher = createEnricher();
+  const accsAuthor = createAccsAuthor();
+  const progress = startProgress(`enriching ${specName(path)}`);
+  enricher.observe(progress.activity);
+  accsAuthor.observe(progress.activity);
+  const result = await enrich(path, { enricher, accsAuthor }, mode, {
     model,
-    taskBudgetTokens: TASK_BUDGET_TOKENS,
+    taskBudgetTokens: ENRICH_TASK_BUDGET_TOKENS,
     force,
   }).finally(progress.stop);
 
-  if (result.status !== 'unchanged') consoleLogger.info(`usage: ${breakdown(llm)}`);
+  if (result.status !== 'unchanged') {
+    consoleLogger.info(
+      `usage: enricher ${breakdown(enricher)} · ACCS author ${breakdown(accsAuthor)}`,
+    );
+  }
 
   if (result.status === 'unchanged') {
     banner('UNCHANGED', 'dim', path);
     paragraph(
-      'Your section has not changed and the last result was not rejected. What it left you:',
+      'spec.md and accs.md have not changed and the last result was not rejected. What it left you:',
     );
 
     section(
@@ -116,12 +116,12 @@ async function main(): Promise<number> {
 }
 
 async function runAccsOnly(path: string, model: string, target: string): Promise<number> {
-  const llm = new ClaudeCodeLlm(model, IDENTITY, { taskBudgetTokens: TASK_BUDGET_TOKENS });
-  llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });
-  const progress = startProgress(`fixing the check for ${path}`);
+  const llm = createAccsAuthor();
+  const progress = startProgress(`fixing the ACCS for ${specName(path)}`);
+  llm.observe(progress.activity);
   const result = await enrichAccs(path, llm, {
     model,
-    taskBudgetTokens: TASK_BUDGET_TOKENS,
+    taskBudgetTokens: ENRICH_TASK_BUDGET_TOKENS,
   }).finally(progress.stop);
 
   if (result.status === 'nothing-to-fix') {

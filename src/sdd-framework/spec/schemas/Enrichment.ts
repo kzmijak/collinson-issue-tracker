@@ -50,16 +50,6 @@ export const enrichedBodySchema = z.object({
       choice: z.string().min(1).describe('what you took, and why'),
     }),
   ),
-  files: z
-    .array(
-      z.object({
-        path: z.string().min(1).describe("relative to the spec's own directory, never leaving it"),
-        content: z.string().min(1).describe('the whole file'),
-        executable: z.boolean().describe('true for scripts').optional(),
-      }),
-    )
-    .min(1)
-    .describe('every file the ACCS needs, the ACCS itself among them'),
 });
 
 export const enrichmentSchema = z.object({

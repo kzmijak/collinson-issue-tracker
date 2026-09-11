@@ -7,7 +7,7 @@ export type EnrichMode = 'default' | 'no-questions';
 export interface Feedback {
   /** The generated half being corrected. */
   previous: string;
-  /** Whether the operator has appended an entry since this verdict was given. */
+  /** Whether the operator has changed spec.md or accs.md since this verdict was given. */
   operatorSectionChanged: boolean;
   verdict: 'approved' | 'rejected';
   summary: string;
@@ -41,6 +41,7 @@ function quote(output: string): string {
 export class EnrichPrompt extends JsonPrompt<Enrichment> {
   constructor(
     private readonly operatorSection: string,
+    private readonly accs: string,
     private readonly mode: EnrichMode = 'default',
     private readonly accsPath = 'accs.bash',
     private readonly feedback?: Feedback,
@@ -59,6 +60,10 @@ export class EnrichPrompt extends JsonPrompt<Enrichment> {
       'Here is the operator section of a specification. Expand it.',
       '',
       this.operatorSection,
+      '',
+      '## accs.md',
+      '',
+      this.accs,
     ].join('\n');
   }
 
@@ -105,8 +110,8 @@ function correctionBrief(feedback: Feedback): string[] {
     `A reviewer returned ${feedback.verdict}: ${feedback.summary}`,
     '',
     feedback.operatorSectionChanged
-      ? 'The operator has appended an entry since that verdict.'
-      : 'The operator section is unchanged since that verdict.',
+      ? 'The operator has changed spec.md or accs.md since that verdict.'
+      : 'spec.md and accs.md are unchanged since that verdict.',
     '',
     ...(feedback.mustFix.length ? ['### Must fix', '', ...findings(feedback.mustFix), ''] : []),
     ...(feedback.shouldFix.length
