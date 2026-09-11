@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toolTarget } from '../../src/llm/ClaudeCodeLlm.js';
+import { toolTarget } from '../../../src/sdd-framework/llm/ClaudeCodeLlm.js';
 
 describe('toolTarget', () => {
   it('prefers the file a tool is editing', () => {
@@ -9,7 +9,7 @@ describe('toolTarget', () => {
   });
 
   it('falls back to the command a shell tool is running', () => {
-    expect(toolTarget({ command: 'bash specs/001/test.bash' })).toBe('bash specs/001/test.bash');
+    expect(toolTarget({ command: 'bash specs/001/accs.bash' })).toBe('bash specs/001/accs.bash');
   });
 
   it('collapses newlines, so a multi-line command stays one line', () => {

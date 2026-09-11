@@ -10,13 +10,13 @@ import {
   resolveGeneratedPath,
   SpecFileEscapeError,
   writeGeneratedFiles,
-} from '../../src/spec/specFiles.js';
+} from '../../../src/sdd-framework/spec/specFiles.js';
 
-const script = { path: 'test.bash', content: '#!/usr/bin/env bash\nexit 0', executable: true };
+const script = { path: 'accs.bash', content: '#!/usr/bin/env bash\nexit 0', executable: true };
 
 describe('resolveGeneratedPath', () => {
   it('accepts a path inside the spec directory', () => {
-    expect(resolveGeneratedPath('/specs/001-x', 'test.bash')).toBe('/specs/001-x/test.bash');
+    expect(resolveGeneratedPath('/specs/001-x', 'accs.bash')).toBe('/specs/001-x/accs.bash');
   });
 
   it('accepts a nested path', () => {
@@ -30,7 +30,7 @@ describe('resolveGeneratedPath', () => {
   });
 
   it('refuses a path that climbs out with ..', () => {
-    expect(() => resolveGeneratedPath('/specs/001-x', '../002-y/test.bash')).toThrow(
+    expect(() => resolveGeneratedPath('/specs/001-x', '../002-y/accs.bash')).toThrow(
       /outside the spec's own directory/,
     );
   });
@@ -52,14 +52,14 @@ describe('writeGeneratedFiles', () => {
 
     expect(written).toHaveLength(2);
     expect(readFileSync(join(dir, 'tests/mock.js'), 'utf8')).toBe('const x = 1;\n');
-    expect(statSync(join(dir, 'test.bash')).mode & 0o111).toBeTruthy();
+    expect(statSync(join(dir, 'accs.bash')).mode & 0o111).toBeTruthy();
     expect(statSync(join(dir, 'tests/mock.js')).mode & 0o111).toBeFalsy();
   });
 
   it('refuses a file set with no test script, writing nothing', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'spec-'));
     await expect(writeGeneratedFiles(dir, [{ path: 'notes.md', content: 'x' }])).rejects.toThrow(
-      /do not include test.bash/,
+      /do not include accs.bash/,
     );
   });
 
@@ -68,22 +68,22 @@ describe('writeGeneratedFiles', () => {
     await expect(
       writeGeneratedFiles(dir, [script, { path: '../escaped.ts', content: 'x' }]),
     ).rejects.toThrow(SpecFileEscapeError);
-    expect(() => statSync(join(dir, 'test.bash'))).toThrow();
+    expect(() => statSync(join(dir, 'accs.bash'))).toThrow();
   });
 });
 
 describe('normaliseGeneratedPath', () => {
   it('strips a repo-root prefix the prompt itself encourages', () => {
-    expect(normaliseGeneratedPath('specs/001-x', 'specs/001-x/test.bash')).toBe('test.bash');
+    expect(normaliseGeneratedPath('specs/001-x', 'specs/001-x/accs.bash')).toBe('accs.bash');
   });
 
   it('leaves an already spec-relative path alone', () => {
-    expect(normaliseGeneratedPath('specs/001-x', 'test.bash')).toBe('test.bash');
+    expect(normaliseGeneratedPath('specs/001-x', 'accs.bash')).toBe('accs.bash');
   });
 
   it('does not strip a lookalike prefix belonging to another spec', () => {
-    expect(normaliseGeneratedPath('specs/001-x', 'specs/001-xy/test.bash')).toBe(
-      'specs/001-xy/test.bash',
+    expect(normaliseGeneratedPath('specs/001-x', 'specs/001-xy/accs.bash')).toBe(
+      'specs/001-xy/accs.bash',
     );
   });
 });
@@ -92,11 +92,11 @@ describe('writeGeneratedFiles with repo-root paths', () => {
   it('writes them into the spec directory, not a nested copy of it', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'spec-'));
     const written = await writeGeneratedFiles(dir, [
-      { path: `${dir}/test.bash`, content: 'exit 0', executable: true },
+      { path: `${dir}/accs.bash`, content: 'exit 0', executable: true },
       { path: `${dir}/harness.mjs`, content: 'export {};' },
     ]);
 
-    expect(written).toEqual([join(dir, 'test.bash'), join(dir, 'harness.mjs')]);
+    expect(written).toEqual([join(dir, 'accs.bash'), join(dir, 'harness.mjs')]);
     expect(readFileSync(join(dir, 'harness.mjs'), 'utf8')).toBe('export {};\n');
   });
 });
@@ -112,7 +112,7 @@ describe('assertBlackBox', () => {
 
   it('refuses a shell script that runs a file under src', () => {
     expect(() =>
-      assertBlackBox([{ path: 'test.bash', content: 'node src/worker/main.ts' }]),
+      assertBlackBox([{ path: 'accs.bash', content: 'node src/worker/main.ts' }]),
     ).toThrow(SpecFileEscapeError);
   });
 
@@ -120,7 +120,7 @@ describe('assertBlackBox', () => {
     expect(() =>
       assertBlackBox([
         {
-          path: 'test.bash',
+          path: 'accs.bash',
           content: 'GITHUB_REPO=a/b pnpm worker > out.log\ngrep -q "#1" out.log',
         },
       ]),
@@ -128,14 +128,14 @@ describe('assertBlackBox', () => {
   });
 
   it('does not trip on words merely ending in src', () => {
-    expect(() => assertBlackBox([{ path: 'test.bash', content: 'echo websrc/foo' }])).not.toThrow();
+    expect(() => assertBlackBox([{ path: 'accs.bash', content: 'echo websrc/foo' }])).not.toThrow();
   });
 });
 
 describe('readPreviousFiles', () => {
   it('reads the file list a previous run recorded', () => {
-    const generated = '<!-- enrich:meta\nsource-sha: abc\nfile: test.bash\nfile: harness.mjs\n-->';
-    expect(readPreviousFiles(generated)).toEqual(['test.bash', 'harness.mjs']);
+    const generated = '<!-- enrich:meta\nsource-sha: abc\nfile: accs.bash\nfile: harness.mjs\n-->';
+    expect(readPreviousFiles(generated)).toEqual(['accs.bash', 'harness.mjs']);
   });
 
   it('returns nothing when a previous run recorded nothing', () => {
@@ -148,11 +148,11 @@ describe('pruneOrphans', () => {
     const dir = mkdtempSync(join(tmpdir(), 'spec-'));
     await writeGeneratedFiles(dir, [script, { path: 'stale.mjs', content: 'old' }]);
 
-    const pruned = await pruneOrphans(dir, ['test.bash', 'stale.mjs'], ['test.bash']);
+    const pruned = await pruneOrphans(dir, ['accs.bash', 'stale.mjs'], ['accs.bash']);
 
     expect(pruned).toEqual(['stale.mjs']);
     expect(() => statSync(join(dir, 'stale.mjs'))).toThrow();
-    expect(statSync(join(dir, 'test.bash')).isFile()).toBe(true);
+    expect(statSync(join(dir, 'accs.bash')).isFile()).toBe(true);
   });
 
   it('leaves files the tool never generated alone', async () => {
@@ -160,7 +160,7 @@ describe('pruneOrphans', () => {
     await writeGeneratedFiles(dir, [script]);
     writeFileSync(join(dir, 'notes-by-hand.md'), 'mine');
 
-    await pruneOrphans(dir, ['test.bash'], ['test.bash']);
+    await pruneOrphans(dir, ['accs.bash'], ['accs.bash']);
 
     expect(statSync(join(dir, 'notes-by-hand.md')).isFile()).toBe(true);
   });

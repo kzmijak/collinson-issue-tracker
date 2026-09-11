@@ -7,7 +7,7 @@ import {
   latestMetricsPath,
   writeMetrics,
   type EnrichMetrics,
-} from '../../src/spec/metrics.js';
+} from '../../../src/sdd-framework/spec/metrics.js';
 
 const base: EnrichMetrics = {
   at: '2026-09-09T10:15:32.481Z',
@@ -70,7 +70,7 @@ describe('amendMetrics', () => {
         verdict: 'rejected',
         summary: 'the check cannot fail',
         mustFix: [
-          { area: 'Falsifiability', quote: 'test.bash exits 0', problem: 'nothing asserts.' },
+          { area: 'Falsifiability', quote: 'accs.bash exits 0', problem: 'nothing asserts.' },
         ],
         shouldFix: [],
         shouldKnow: [],

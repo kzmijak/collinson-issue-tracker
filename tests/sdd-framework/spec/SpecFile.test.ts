@@ -9,7 +9,7 @@ import {
   specSha,
   SpecFormatError,
   splitSpec,
-} from '../../src/spec/SpecFile.js';
+} from '../../../src/sdd-framework/spec/SpecFile.js';
 
 const head = [
   '# 001 — Prototype issues reader',
@@ -114,16 +114,16 @@ describe('readStatus', () => {
     expect(readStatus('<!-- enrich:meta\nsource-sha: abc\nstatus: rejected\n-->')).toBe('rejected');
   });
 
-  it('treats a section with no verdict as unverified', () => {
-    expect(readStatus('<!-- enrich:meta\nsource-sha: abc\n-->')).toBe('unverified');
+  it('treats a section with no verdict as draft', () => {
+    expect(readStatus('<!-- enrich:meta\nsource-sha: abc\n-->')).toBe('draft');
   });
 });
 
 describe('specSha', () => {
-  const full = `${head}\n\n<!-- enrich:meta\nsource-sha: abc\nstatus: unverified\n-->\n\n## Read this first\n\nbody`;
+  const full = `${head}\n\n<!-- enrich:meta\nsource-sha: abc\nstatus: draft\n-->\n\n## Read this first\n\nbody`;
 
   it('ignores the status line verify writes itself', () => {
-    expect(specSha(full.replace('status: unverified', 'status: accepted'))).toBe(specSha(full));
+    expect(specSha(full.replace('status: draft', 'status: approved'))).toBe(specSha(full));
   });
 
   it('changes when the generated half changes', () => {

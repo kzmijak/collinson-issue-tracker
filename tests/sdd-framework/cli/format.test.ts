@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inline, wrap } from '../../src/cli/format.js';
+import { inline, wrap } from '../../../src/sdd-framework/cli/format.js';
 
 describe('inline', () => {
   it('renders bold rather than leaving asterisks in front of the operator', () => {

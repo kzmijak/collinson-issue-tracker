@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApplyPrompt, ReapplyPrompt } from '../../src/spec/ApplyPrompt.js';
-import { ModelContractError } from '../../src/spec/EnrichPrompt.js';
+import { ApplyPrompt, ReapplyPrompt } from '../../../src/sdd-framework/spec/ApplyPrompt.js';
+import { ModelContractError } from '../../../src/sdd-framework/spec/EnrichPrompt.js';
 
 const answer = {
   summary: 'built it',
@@ -12,10 +12,10 @@ const answer = {
 
 const prompt = new ApplyPrompt({
   spec: '# 001 — Thing\n\n## What I want\n\n### 2026-09-09 — x\n\nprose',
-  artefacts: '### test.bash\n\nexit 1',
+  artefacts: '### accs.bash\n\nexit 1',
   knowledge: '',
   instructions: 'You implement specifications.',
-  script: 'specs/001-thing/test.bash',
+  script: 'specs/001-thing/accs.bash',
 });
 
 describe('ApplyPrompt', () => {
@@ -30,11 +30,8 @@ describe('ApplyPrompt', () => {
   });
 
   it('tells the implementer how short the answer has to be', () => {
-    const message = prompt.createMessage();
-
-    expect(message).toContain('at most three sentences');
-    expect(message).toContain('one sentence');
-    expect(message).toContain('do not narrate your own process');
+    expect(ApplyPrompt.outputSpecification).toContain('at most three sentences');
+    expect(ApplyPrompt.outputSpecification).toContain('"why": "<one sentence>"');
   });
 
   it('carries the spec, the generated files and the check command, and nothing else', () => {
@@ -42,14 +39,14 @@ describe('ApplyPrompt', () => {
 
     expect(message).toContain('### 2026-09-09 — x');
     expect(message).toContain('exit 1');
-    expect(message).toContain('bash specs/001-thing/test.bash');
+    expect(message).toContain('bash specs/001-thing/accs.bash');
     expect(message).toContain('(empty — nothing has been added to it yet)');
   });
 
   it('never restates a repo convention the identity is responsible for', () => {
     const message = prompt.createMessage().replace('You implement specifications.', '');
 
-    for (const leak of ['src/spec/', 'TypeScript', 'Vitest', 'pnpm', 'git commit']) {
+    for (const leak of ['src/sdd-framework/', 'TypeScript', 'Vitest', 'pnpm', 'git commit']) {
       expect(message).not.toContain(leak);
     }
   });

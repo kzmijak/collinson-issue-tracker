@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describe as line } from '../../src/cli/live.js';
+import { describe as line } from '../../../src/sdd-framework/cli/live.js';
 
 describe('describe', () => {
   it('names the tool and what it is acting on', () => {
@@ -36,14 +36,14 @@ describe('describe', () => {
 
 describe('brief', () => {
   it('keeps the first sentences and drops the essay', async () => {
-    const { brief } = await import('../../src/cli/report.js');
+    const { brief } = await import('../../../src/sdd-framework/cli/report.js');
     const result = brief('One. Two. Three. Four. Five.');
 
     expect(result).toBe('One. Two. Three.');
   });
 
   it('clips a single runaway sentence rather than printing all of it', async () => {
-    const { brief } = await import('../../src/cli/report.js');
+    const { brief } = await import('../../../src/sdd-framework/cli/report.js');
     const result = brief(`${'word '.repeat(400)}end.`);
 
     expect(result.length).toBeLessThan(430);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { numberFlag, positional } from '../../src/cli/args.js';
+import { numberFlag, positional } from '../../../src/sdd-framework/cli/args.js';
 
 describe('positional', () => {
   it('finds the spec among flags', () => {

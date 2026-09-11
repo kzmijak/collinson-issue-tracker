@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { EnrichPrompt, ModelContractError } from '../../src/spec/EnrichPrompt.js';
+import { EnrichPrompt, ModelContractError } from '../../../src/sdd-framework/spec/EnrichPrompt.js';
 
 const body = {
   summary: 'x',
-  check: 'bash test.bash',
+  check: 'bash accs.bash',
   proves: 'x',
   numbers: 'x',
   notThis: 'x',
   doneWhen: ['x'],
   behaviours: [{ name: 'x', cases: [{ input: 'a', expected: 'b' }] }],
-  acceptance: { command: 'bash test.bash', expectation: 'exits 0' },
+  acceptance: { command: 'bash accs.bash', expectation: 'exits 0' },
   decisions: [{ decision: 'x', why: 'y' }],
   outOfScope: ['x'],
   openQuestions: ['already here'],
   assumptions: [{ question: 'x', choice: 'y' }],
-  files: [{ path: 'test.bash', content: 'exit 0' }],
+  files: [{ path: 'accs.bash', content: 'exit 0' }],
 };
 
 const prompt = new EnrichPrompt('## What I want\n\n### 2026-09-09 — x\n\nprose');

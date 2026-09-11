@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readAgentPrompt } from '../../src/spec/agentPrompt.js';
+import { readAgentPrompt } from '../../../src/sdd-framework/spec/agentPrompt.js';
 
 function write(body: string): string {
   const path = join(mkdtempSync(join(tmpdir(), 'agent-')), 'agent.md');

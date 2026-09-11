@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { JsonPrompt } from '../../src/llm/JsonPrompt.js';
+import { JsonPrompt } from '../../../src/sdd-framework/llm/JsonPrompt.js';
 
 class Probe extends JsonPrompt<{ verdict: string }> {
   protected outputParser(output: object): { verdict: string } {

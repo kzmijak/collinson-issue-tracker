@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { resolveSpecPath, SpecNotFoundError } from '../../src/spec/resolveSpecPath.js';
+import {
+  resolveSpecPath,
+  SpecNotFoundError,
+} from '../../../src/sdd-framework/spec/resolveSpecPath.js';
 
 let specs: string;
 

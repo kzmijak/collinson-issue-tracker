@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EnrichedBody } from '../../src/spec/EnrichedSpec.js';
-import { renderSpec } from '../../src/spec/renderSpec.js';
+import type { EnrichedBody } from '../../../src/sdd-framework/spec/schemas/Enrichment.js';
+import { renderSpec } from '../../../src/sdd-framework/spec/renderSpec.js';
 
 const body: EnrichedBody = {
   summary: 'Polls a repository and logs its issues.',
@@ -17,15 +17,15 @@ const body: EnrichedBody = {
   outOfScope: ['pagination'],
   openQuestions: ['Is the token mandatory? Recommendation: yes.'],
   assumptions: [{ question: 'Sort order?', choice: 'API order — the operator named none.' }],
-  files: [{ path: 'test.bash', content: '#!/usr/bin/env bash\nexit 0', executable: true }],
+  files: [{ path: 'accs.bash', content: '#!/usr/bin/env bash\nexit 0', executable: true }],
 };
 
 const meta = {
   generatedOn: '2026-09-08',
   entries: ['2026-09-07 — first'],
   sourceSha: 'abc123',
-  files: ['test.bash'],
-  status: 'unverified' as const,
+  files: ['accs.bash'],
+  status: 'draft' as const,
 };
 
 describe('renderSpec', () => {

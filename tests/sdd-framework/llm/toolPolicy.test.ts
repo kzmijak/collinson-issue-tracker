@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toolPolicy } from '../../src/llm/ClaudeCodeLlm.js';
+import { toolPolicy } from '../../../src/sdd-framework/llm/ClaudeCodeLlm.js';
 
 describe('toolPolicy', () => {
   it('spells out a denial of every tool when the call is meant to have none', () => {

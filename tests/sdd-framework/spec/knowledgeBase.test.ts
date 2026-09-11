@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readKnowledgeBase } from '../../src/spec/knowledgeBase.js';
+import { readKnowledgeBase } from '../../../src/sdd-framework/spec/knowledgeBase.js';
 
 describe('readKnowledgeBase', () => {
   it('is empty when the directory does not exist, which is the normal state', async () => {

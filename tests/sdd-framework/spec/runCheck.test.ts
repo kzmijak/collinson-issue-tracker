@@ -2,10 +2,10 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { COULD_NOT_RUN, excerpt, runCheck } from '../../src/spec/runCheck.js';
+import { COULD_NOT_RUN, excerpt, runCheck } from '../../../src/sdd-framework/spec/runCheck.js';
 
 function script(body: string): string {
-  const path = join(mkdtempSync(join(tmpdir(), 'check-')), 'test.bash');
+  const path = join(mkdtempSync(join(tmpdir(), 'check-')), 'accs.bash');
   writeFileSync(path, body, 'utf8');
   return path;
 }

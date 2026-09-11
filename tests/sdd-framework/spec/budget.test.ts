@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { budgetTokens, WEIGHTED_ET_PER_OUTPUT_TOKEN } from '../../src/spec/budget.js';
+import {
+  budgetTokens,
+  WEIGHTED_ET_PER_OUTPUT_TOKEN,
+} from '../../../src/sdd-framework/spec/budget.js';
 
 describe('budgetTokens', () => {
   it('converts an effective-token ceiling into the plain tokens taskBudget expects', () => {
