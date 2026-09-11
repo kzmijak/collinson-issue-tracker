@@ -1,56 +1,33 @@
 # Specifications
 
-The executable layer. `PLAN.md` says what the system is and why; a spec says what to build next and
-how we will know it worked. One spec per work-order step, committed **before** its implementation.
-
-One directory per spec, numbered in the order they were written rather than by priority:
+How specs work is in `CONCEPT.md`: SDD Framework Goals, Components and the Dictionary. This page is
+only the layout.
 
 ```
-specs/001-<slug>/
-├─ spec.md      ← the spec
-├─ tests/       ← what proves this spec, as opposed to what proves a module
-└─ test.bash    ← the whole verification procedure, one entry point
+specs/NNN-<slug>/
+├─ spec.md     ← What I want (yours), then everything below the marker (pnpm enrich)
+├─ accs.bash   ← the acceptance criteria check script, written by pnpm enrich
+├─ …           ← any helper file the ACCS needs, also written by pnpm enrich
+└─ metrics/    ← one JSON report per enrich, verify and apply run
 ```
 
-`test.bash` exists because not every spec can be proved by Vitest — a container spec is a build, a
-run and an assertion about stdout. It exits `0` for passing, `1` for failing and `2` for "could not
-run here", which the caller must treat differently: a missing Docker on a reviewer's machine is not
-a failing implementation.
+Specs are numbered in the order they were written.
 
-Unit tests stay in `tests/`, mirroring `src/`. They answer "does this module work". A spec's own
-tests answer "is this spec satisfied". Two different questions.
+## Starting a spec
 
-## Why the commit order matters
+Copy `999-spec-template.md` to `specs/NNN-<slug>/spec.md` and write the first entry under What I
+want. Then `pnpm enrich NNN`, `pnpm verify NNN`, `pnpm apply NNN`.
 
-The specs and the implementations that follow them are the progression record this exercise asks
-for, and git timestamps are the evidence. A spec committed in the same commit as its code, or after
-it, reads as reconstruction — which is the opposite of what it is meant to demonstrate. So:
+## Changing a spec
 
-```
-spec(harness): per-field metrics and acceptance checks
-feat(harness): implement metric computation per 003
-spec(harness): revise — urgency MAE needs per-class N, not aggregate
-fix(harness): report per-class N per revised 003
-```
+Append a new dated entry, a breakpoint. Never edit one that is already there. The next `enrich`
+picks the change up, and `verify` and `apply` refuse to act until it has run.
 
-**Amendments are the most valuable entries.** A spec that was never revised looks like a spec
-written after the fact. When reality contradicts the spec, amend it in its own commit and say what
-changed the decision.
+## ACCS and unit tests
 
-## Template
+The ACCS answers "does the world match this spec". It drives the system from the outside — commands,
+environment variables, HTTP, stdout, stderr, exit codes — and never names anything inside `src/`. It
+exits `0` when the world matches, `1` when it doesn't, and `2` when it couldn't decide.
 
-`999-spec-template.md`. Copy it to `specs/NNN-<slug>/spec.md` and fill in `What I want`.
-
-The shape in one paragraph: **you write prose, the tool writes structure.** `What I want` is yours —
-dated entries, appended, never edited once written, because that section is the record of what was
-decided and when. Everything below the generated marker is produced by `pnpm enrich` from those
-entries: the four-row summary a reader must read, the examples, the acceptance check. Anything
-`enrich` cannot derive comes back as an open question instead of being guessed at.
-
-The rules that make it work are in `.claude/rules/specs.md`.
-
-## Just-in-time
-
-Write the spec for step N, build it, then write N+1 with what you learned. Do not write the whole
-sequence up front — in a time-boxed exercise the ceremony becomes the work, and eight polished specs
-against three implementations is the wrong trade.
+Unit tests answer "does this module work". They live in `tests/`, mirror `src/`, and are written by
+the implementer. The ACCS never runs them.
