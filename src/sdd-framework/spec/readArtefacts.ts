@@ -1,25 +1,22 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { METRICS_DIR } from './metrics.js';
 import { ENRICHED_SPEC } from './specFiles.js';
 
 const ARTEFACT_LIMIT = 20_000;
 
 /**
- * Everything the spec generated alongside itself. Without these the verifier cannot see whether the
- * check can fail — its most important question — and it correctly complains that the contract is
- * delegated to a file it was never shown. The implementer needs them for the same reason from the
- * other side: the check is the definition of done, so it has to be able to read it.
+ * Everything the ACCS author wrote — the entry point and any suite behind it, however deep. Without
+ * these the verifier cannot see whether the check can fail, which is its most important question,
+ * and the implementer cannot read the definition of done. The enriched spec and the metrics are
+ * the tool's own, and reach agents another way.
  */
 export async function readArtefacts(outputDir: string): Promise<string> {
-  const names = await readdir(outputDir).catch(() => [] as string[]);
   const parts: string[] = [];
 
-  for (const name of names.sort()) {
-    if (name === ENRICHED_SPEC || name === METRICS_DIR) continue;
-
-    const target = join(outputDir, name);
-    if (!(await stat(target)).isFile()) continue;
+  for (const target of await filesUnder(outputDir)) {
+    const name = relative(outputDir, target);
+    if (name === ENRICHED_SPEC || name.split('/')[0] === METRICS_DIR) continue;
 
     const content = await readFile(target, 'utf8');
     parts.push(
@@ -27,4 +24,16 @@ export async function readArtefacts(outputDir: string): Promise<string> {
     );
   }
   return parts.join('\n\n');
+}
+
+async function filesUnder(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  const files: string[] = [];
+
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const target = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...(await filesUnder(target)));
+    else if (entry.isFile()) files.push(target);
+  }
+  return files;
 }
