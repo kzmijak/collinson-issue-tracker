@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { COULD_NOT_RUN, excerpt, runCheck } from '../../../src/sdd-framework/spec/runCheck.js';
+import { excerpt, runCheck } from '../../../src/sdd-framework/spec/runCheck.js';
 
 function script(body: string): string {
   const path = join(mkdtempSync(join(tmpdir(), 'check-')), 'accs.bash');
@@ -26,11 +26,11 @@ describe('runCheck', () => {
     expect(result.output).toContain('FAIL: nope');
   });
 
-  it('treats a check that hangs as unable to judge, not as a failure', async () => {
+  it('treats a check that hangs as failing — usually it is waiting on a service that never answered', async () => {
     const result = await runCheck(script('sleep 30'), 300);
 
     expect(result.timedOut).toBe(true);
-    expect(result.exitCode).toBe(COULD_NOT_RUN);
+    expect(result.exitCode).toBe(1);
   });
 });
 

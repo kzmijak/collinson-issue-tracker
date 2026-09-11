@@ -1,11 +1,8 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import { resolveSpecPath, SpecNotFoundError } from '../spec/resolveSpecPath.js';
-import { ACCS_SCRIPT } from '../spec/specFiles.js';
+import { specPaths } from '../spec/specFolder.js';
 import { consoleLogger } from './consoleLogger.js';
-
-const COULD_NOT_RUN = 2;
 
 /**
  * With no argument this is the unit suite; with a spec it is that spec's own acceptance check.
@@ -19,22 +16,19 @@ function main(): void {
     return;
   }
 
-  const script = join(dirname(resolveSpecPath(target)), ACCS_SCRIPT);
+  const script = specPaths(resolveSpecPath(target)).accsScript;
 
   if (!existsSync(script)) {
     consoleLogger.error(`${script} does not exist — run \`pnpm enrich ${target}\` first.`);
-    process.exitCode = COULD_NOT_RUN;
+    process.exitCode = 1;
     return;
   }
 
-  forward('bash', [script], () => {
-    consoleLogger.error(`${script} could not run here — this is not a failing implementation.`);
-  });
+  forward('bash', [script]);
 }
 
-function forward(command: string, args: string[], onCouldNotRun?: () => void): void {
+function forward(command: string, args: string[]): void {
   spawn(command, args, { stdio: 'inherit' }).on('close', (code) => {
-    if (code === COULD_NOT_RUN) onCouldNotRun?.();
     process.exitCode = code ?? 1;
   });
 }
@@ -45,5 +39,5 @@ try {
   consoleLogger.error(
     error instanceof SpecNotFoundError ? error.message : `${(error as Error).message}`,
   );
-  process.exitCode = COULD_NOT_RUN;
+  process.exitCode = 1;
 }

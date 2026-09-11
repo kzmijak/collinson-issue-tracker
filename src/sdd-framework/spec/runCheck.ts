@@ -1,8 +1,5 @@
 import { spawn } from 'node:child_process';
 
-/** The exit code reserved by `.claude/rules/testing.md` for "could not run here". */
-export const COULD_NOT_RUN = 2;
-
 export interface CheckResult {
   exitCode: number;
   output: string;
@@ -35,9 +32,9 @@ export function runCheck(script: string, timeoutMs: number): Promise<CheckResult
       clearTimeout(timer);
       killGroup(child.pid);
       resolve({
-        // A check that hangs has not judged the implementation, so it is reported as unable to run
-        // rather than as a failure the implementer should try to fix.
-        exitCode: timedOut ? COULD_NOT_RUN : (code ?? 1),
+        // A check that hangs is most often waiting on a service that never answered — the usual
+        // state before anything is implemented — so it counts as failing, not as passing.
+        exitCode: timedOut ? 1 : (code ?? 1),
         output: chunks.join(''),
         timedOut,
         durationMs: Date.now() - startedAt,

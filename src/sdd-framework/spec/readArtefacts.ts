@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { METRICS_DIR } from './metrics.js';
+import { ENRICHED_SPEC } from './specFiles.js';
 
 const ARTEFACT_LIMIT = 20_000;
 
@@ -10,14 +11,14 @@ const ARTEFACT_LIMIT = 20_000;
  * delegated to a file it was never shown. The implementer needs them for the same reason from the
  * other side: the check is the definition of done, so it has to be able to read it.
  */
-export async function readArtefacts(specDir: string): Promise<string> {
-  const names = await readdir(specDir).catch(() => [] as string[]);
+export async function readArtefacts(outputDir: string): Promise<string> {
+  const names = await readdir(outputDir).catch(() => [] as string[]);
   const parts: string[] = [];
 
   for (const name of names.sort()) {
-    if (name === 'spec.md' || name === METRICS_DIR) continue;
+    if (name === ENRICHED_SPEC || name === METRICS_DIR) continue;
 
-    const target = join(specDir, name);
+    const target = join(outputDir, name);
     if (!(await stat(target)).isFile()) continue;
 
     const content = await readFile(target, 'utf8');

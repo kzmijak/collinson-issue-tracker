@@ -1,7 +1,12 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 export class SpecNotFoundError extends Error {}
+
+/** The spec's directory name — what a reader recognises it by, without the path that never varies. */
+export function specName(path: string): string {
+  return basename(dirname(path));
+}
 
 export function resolveSpecPath(target: string, specsDir = 'specs'): string {
   if (existsSync(target) && target.endsWith('.md')) return target;

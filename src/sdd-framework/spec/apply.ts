@@ -1,6 +1,4 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import type { Activity, Llm, TokenUsage } from '../llm/Llm.js';
 import { budgetTokens, MIN_ROUND_EFFECTIVE_TOKENS } from './budget.js';
 import { readAgentPrompt } from './agentPrompt.js';
@@ -9,9 +7,9 @@ import type { Implementation } from './schemas/Implementation.js';
 import { readKnowledgeBase } from './knowledgeBase.js';
 import { amendMetrics } from './metrics.js';
 import { readArtefacts } from './readArtefacts.js';
-import { COULD_NOT_RUN, runCheck, type CheckResult } from './runCheck.js';
-import { isEnrichmentStale, readStatus, specSha, splitSpec } from './SpecFile.js';
-import { ACCS_SCRIPT } from './specFiles.js';
+import { runCheck, type CheckResult } from './runCheck.js';
+import { readStatus, specSha } from './SpecFile.js';
+import { describeSpec, isStale, readSpecFolder } from './specFolder.js';
 
 export const IMPLEMENTER_DEFINITION = '.ai/identities/implementer.md';
 
@@ -21,7 +19,6 @@ export type ApplyStatus =
   | 'nothing-to-do'
   | 'blocked'
   | 'refused'
-  | 'check-unrunnable'
   | 'budget-exhausted'
   | 'time-exhausted';
 
@@ -56,14 +53,13 @@ export interface ApplyResult {
  */
 export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<ApplyResult> {
   const startedAt = Date.now();
-  const specDir = dirname(path);
-  const source = await readFile(path, 'utf8');
-  const split = splitSpec(source);
-  const verdict = readStatus(split.generated);
+  const folder = await readSpecFolder(path);
+  const { output } = folder.paths;
+  const verdict = readStatus(folder.enriched);
 
-  if (isEnrichmentStale(split) && !props.force) {
+  if (isStale(folder) && !props.force) {
     return refused(
-      'the operator section changed since the spec was enriched and approved — run `pnpm enrich` ' +
+      'spec.md or accs.md changed since the spec was enriched and approved — run `pnpm enrich` ' +
         'and `pnpm verify` first, or `--force`.',
     );
   }
@@ -75,7 +71,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     );
   }
 
-  const script = join(specDir, ACCS_SCRIPT);
+  const script = folder.paths.accsScript;
   if (!existsSync(script)) {
     return refused(`${script} does not exist — there is no acceptance check to converge on.`);
   }
@@ -88,20 +84,9 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
   if (before.exitCode === 0) {
     return { ...empty(), status: 'nothing-to-do', check: before };
   }
-  if (before.exitCode === COULD_NOT_RUN) {
-    return {
-      ...empty(),
-      status: 'check-unrunnable',
-      check: before,
-      detail: before.timedOut
-        ? `the check did not finish within ${props.checkTimeoutMs / 1000}s, so it has not judged ` +
-          'anything. Nothing was spent.'
-        : 'the check reported that it could not run here, which is not a failing implementation.',
-    };
-  }
 
   const instructions = readAgentPrompt(IMPLEMENTER_DEFINITION, { without: ['Output format'] });
-  const artefacts = await readArtefacts(specDir);
+  const artefacts = await readArtefacts(output);
   const knowledge = await readKnowledgeBase();
 
   let check = before;
@@ -128,7 +113,13 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
 
     const prompt =
       round === 1
-        ? new ApplyPrompt({ spec: source, artefacts, knowledge, instructions, script })
+        ? new ApplyPrompt({
+            spec: describeSpec(folder),
+            artefacts,
+            knowledge,
+            instructions,
+            script,
+          })
         : new ReapplyPrompt(check, round, props.rounds);
 
     const allowance = budgetTokens(remaining, props.model);
@@ -152,7 +143,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
         : `check failed in ${Math.round(check.durationMs / 1000)}s (exit ${check.exitCode})`,
     );
 
-    if (check.exitCode === 0 || check.exitCode === COULD_NOT_RUN) break;
+    if (check.exitCode === 0) break;
   }
 
   const status = exhausted
@@ -160,7 +151,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     : outOfTime
       ? 'time-exhausted'
       : settle(implementation, check);
-  const attachedTo = await amendMetrics(specDir, {
+  const attachedTo = await amendMetrics(output, {
     application: {
       at: new Date().toISOString(),
       status,
@@ -177,7 +168,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
       withinBudget: effectiveTokens <= props.effectiveTokenBudget,
       usage: llm.totalUsage,
       model: props.model,
-      specSha: specSha(source),
+      specSha: specSha(folder.operatorSection, folder.accs, folder.enriched, artefacts),
     },
   });
 
@@ -195,7 +186,6 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
 function settle(implementation: Implementation | null, check: CheckResult): ApplyStatus {
   if (implementation?.blocked) return 'blocked';
   if (check.exitCode === 0) return 'converged';
-  if (check.exitCode === COULD_NOT_RUN) return 'check-unrunnable';
   return 'not-converged';
 }
 

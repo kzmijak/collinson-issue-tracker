@@ -2,7 +2,7 @@ import { apply, type ApplyResult } from '../spec/apply.js';
 import { ClaudeCodeLlm } from '../llm/ClaudeCodeLlm.js';
 import { PROJECT_CONTEXT, readAgentPrompt } from '../spec/agentPrompt.js';
 import { ModelContractError } from '../spec/EnrichPrompt.js';
-import { resolveSpecPath, SpecNotFoundError } from '../spec/resolveSpecPath.js';
+import { resolveSpecPath, SpecNotFoundError, specName } from '../spec/resolveSpecPath.js';
 import { SpecFormatError } from '../spec/SpecFile.js';
 import { excerpt } from '../spec/runCheck.js';
 import { numberFlag, positional } from './args.js';
@@ -86,7 +86,7 @@ async function main(): Promise<number> {
     ),
   );
 
-  const live = startLive(`applying ${path}`);
+  const live = startLive(`applying ${specName(path)}`);
   const result = await apply(path, llm, {
     model: MODEL,
     effectiveTokenBudget: budget,
@@ -101,9 +101,9 @@ async function main(): Promise<number> {
 }
 
 function report(result: ApplyResult, spec: string, budget: number): number {
-  if (result.status === 'refused' || result.status === 'check-unrunnable') {
-    banner(result.status === 'refused' ? 'REFUSED' : 'CANNOT CHECK', 'yellow', spec);
-    paragraph(result.detail ?? 'the check could not judge anything.');
+  if (result.status === 'refused') {
+    banner('REFUSED', 'yellow', spec);
+    paragraph(result.detail ?? 'refused.');
     if (result.check?.output) showOutput(result.check.output);
     return 2;
   }

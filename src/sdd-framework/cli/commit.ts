@@ -6,7 +6,9 @@ import { CommitPlanPrompt } from '../spec/CommitPlanPrompt.js';
 import type { CommitPlan } from '../spec/schemas/CommitPlan.js';
 import { ModelContractError } from '../spec/EnrichPrompt.js';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { amendMetrics, latestMetricsPath, type CommitNote } from '../spec/metrics.js';
+import { OUTPUT_DIR } from '../spec/specFolder.js';
 import { consoleLogger } from './consoleLogger.js';
 import { banner, note, paragraph, section } from './report.js';
 import { startProgress } from './progress.js';
@@ -120,11 +122,12 @@ async function link(files: string[], note: CommitNote): Promise<string[]> {
   const written: string[] = [];
 
   for (const dir of dirs) {
-    const path = await latestMetricsPath(dir);
+    const output = join(dir, OUTPUT_DIR);
+    const path = await latestMetricsPath(output);
     if (!path) continue;
 
     const existing = JSON.parse(readFileSync(path, 'utf8')) as { commits?: CommitNote[] };
-    await amendMetrics(dir, { commits: [...(existing.commits ?? []), note] });
+    await amendMetrics(output, { commits: [...(existing.commits ?? []), note] });
     written.push(path);
   }
   return written;
@@ -143,6 +146,7 @@ async function main(): Promise<number> {
     taskBudgetTokens: TASK_BUDGET_TOKENS,
   });
   const progress = startProgress('planning commits');
+  llm.observe(progress.activity);
   const plan = await llm
     .prompt(new CommitPlanPrompt(readAgentPrompt(PLANNER_DEFINITION), state), { fresh: true })
     .finally(progress.stop);

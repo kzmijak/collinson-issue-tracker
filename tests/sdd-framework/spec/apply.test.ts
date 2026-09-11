@@ -1,10 +1,7 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { apply, type ApplyProps } from '../../../src/sdd-framework/spec/apply.js';
 import type { Llm, SystemPromptData, TokenUsage } from '../../../src/sdd-framework/llm/Llm.js';
-import { headSha, splitSpec } from '../../../src/sdd-framework/spec/SpecFile.js';
+import { specFixture } from './specFixture.js';
 
 const props: ApplyProps = {
   model: 'claude-sonnet-5',
@@ -50,32 +47,9 @@ class AlwaysAnswers extends NeverCalled {
   }
 }
 
-const HEAD = [
-  '# 001 — Thing',
-  '',
-  '## What I want',
-  '',
-  '### 2026-09-09 — x',
-  '',
-  'prose',
-  '',
-  '<!-- enrich:generated -->',
-].join('\n');
-
-function spec(status: string, check = 'exit 1', sourceSha = headSha(splitSpec(HEAD).head)): string {
-  const dir = mkdtempSync(join(tmpdir(), 'apply-'));
-  const path = join(dir, 'spec.md');
-
-  writeFileSync(
-    path,
-    [HEAD, '', '<!-- enrich:meta', `source-sha: ${sourceSha}`, `status: ${status}`, '-->'].join(
-      '\n',
-    ),
-    'utf8',
-  );
-  writeFileSync(join(dir, 'accs.bash'), check, 'utf8');
-
-  return path;
+/** An enriched spec with the given status, whose ACCS is the given shell snippet. */
+function spec(status: string, check = 'exit 1', sourceSha?: string): string {
+  return specFixture({ enriched: { status, sourceSha }, accsScript: check }).path;
 }
 
 describe('apply', () => {
@@ -97,18 +71,6 @@ describe('apply', () => {
     expect(llm.calls).toBe(0);
   });
 
-  it('reports a check it cannot run rather than asking an implementer to fix it', async () => {
-    const llm = new NeverCalled();
-    const result = await apply(spec('approved', 'sleep 30'), llm, {
-      ...props,
-      checkTimeoutMs: 300,
-    });
-
-    expect(result.status).toBe('check-unrunnable');
-    expect(result.detail).toContain('has not judged anything');
-    expect(llm.calls).toBe(0);
-  });
-
   it('starts no new round once the time limit has passed', async () => {
     const llm = new AlwaysAnswers();
     const result = await apply(spec('approved'), llm, { ...props, rounds: 3, timeLimitMs: 0 });
@@ -117,12 +79,32 @@ describe('apply', () => {
     expect(llm.calls).toBe(1);
   });
 
-  it('refuses an approved spec whose operator section changed after approval', async () => {
+  it('refuses an approved spec whose spec.md or accs.md changed after approval', async () => {
     const llm = new NeverCalled();
     const result = await apply(spec('approved', 'exit 1', 'aaaaaaaaaaaa'), llm, props);
 
     expect(result.status).toBe('refused');
     expect(result.detail).toContain('run `pnpm enrich`');
     expect(llm.calls).toBe(0);
+  });
+
+  it('treats any non-zero check as work to do, exit 2 included — the thing it checks may not exist yet', async () => {
+    const llm = new AlwaysAnswers();
+    const result = await apply(spec('approved', 'exit 2'), llm, props);
+
+    expect(llm.calls).toBe(2);
+    expect(result.status).toBe('not-converged');
+  });
+
+  it('treats a check that times out before implementation as work to do', async () => {
+    const llm = new AlwaysAnswers();
+    const result = await apply(spec('approved', 'sleep 30'), llm, {
+      ...props,
+      rounds: 1,
+      checkTimeoutMs: 300,
+    });
+
+    expect(llm.calls).toBe(1);
+    expect(result.status).toBe('not-converged');
   });
 });

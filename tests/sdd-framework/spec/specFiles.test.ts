@@ -31,7 +31,16 @@ describe('resolveGeneratedPath', () => {
 
   it('refuses a path that climbs out with ..', () => {
     expect(() => resolveGeneratedPath('/specs/001-x', '../002-y/accs.bash')).toThrow(
-      /outside the spec's own directory/,
+      /outside the spec's output directory/,
+    );
+  });
+
+  it('refuses to overwrite the enriched spec or the metrics the tool keeps', () => {
+    expect(() => resolveGeneratedPath('/specs/001-x/output', 'enriched-spec.md')).toThrow(
+      /kept by the tool/,
+    );
+    expect(() => resolveGeneratedPath('/specs/001-x/output', 'metrics/x.json')).toThrow(
+      /kept by the tool/,
     );
   });
 

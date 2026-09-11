@@ -1,78 +1,41 @@
 import { createHash } from 'node:crypto';
-export const GENERATED_MARKER =
-  '<!-- enrich:generated — everything below is written by `pnpm enrich`; do not edit by hand -->';
 
-const MARKER_TOKEN = 'enrich:generated';
+/** Older specs carry this line; anything below it predates the output/ folder and is ignored. */
+const LEGACY_MARKER = 'enrich:generated';
 const WHAT_I_WANT = '## What I want';
 const ENTRY = /^### \d{4}-\d{2}-\d{2} — \S/m;
 
 export class SpecFormatError extends Error {}
 
-/** Identifies the operator's section by its words, so a formatter cannot invalidate it. */
-export function headSha(head: string): string {
-  return createHash('sha256').update(normaliseHead(head)).digest('hex').slice(0, 12);
-}
-
 /**
- * The head is hashed to decide whether a paid regeneration is needed. Prettier is free to reflow
- * the operator's prose, so the hash ignores whitespace and reacts only to the words.
+ * Prettier is free to reflow the operator's prose, so hashes ignore whitespace and react only to the
+ * words.
  */
-export function normaliseHead(head: string): string {
-  return head.replace(/\s+/g, ' ').trim();
+export function normalise(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
 }
 
-/** The operator appended an entry after the generated half was written, so that half answers older words. */
-export function isEnrichmentStale({ head, generated }: SplitSpec): boolean {
-  return !generated.includes(`source-sha: ${headSha(head)}`);
+/** Identifies what the operator wrote — spec.md and accs.md together — by its words. */
+export function sourceSha(operatorSection: string, accs: string): string {
+  return hash(`${normalise(operatorSection)}\n---accs---\n${normalise(accs)}`);
 }
 
-export interface SplitSpec {
-  head: string;
-  generated: string;
-}
-
-export function splitSpec(source: string): SplitSpec {
+/** The operator's section of spec.md, validated. */
+export function readOperatorSection(source: string): string {
   const lines = source.split('\n');
-  const markerIndex = lines.findIndex((line) => line.includes(MARKER_TOKEN));
+  const marker = lines.findIndex((line) => line.includes(LEGACY_MARKER));
+  const section = (marker < 0 ? lines : lines.slice(0, marker)).join('\n').trim();
 
-  if (markerIndex < 0) {
-    throw new SpecFormatError(
-      `no \`${MARKER_TOKEN}\` marker — the spec is not in the current format. ` +
-        'Move the operator prose under `## What I want` and add the marker; see specs/999-spec-template.md.',
-    );
-  }
-  if (!source.includes(WHAT_I_WANT)) {
+  if (!section.includes(WHAT_I_WANT)) {
     throw new SpecFormatError(`no \`${WHAT_I_WANT}\` section — there is nothing to enrich from.`);
   }
-
-  const head = lines.slice(0, markerIndex + 1).join('\n');
-
-  if (!ENTRY.test(head)) {
+  if (!ENTRY.test(section)) {
     throw new SpecFormatError(
       'no dated entry under `## What I want` — expected a heading like `### 2026-09-07 — label`.',
     );
   }
-  assertDistinctLabels(head);
-
-  return {
-    head,
-    generated: lines
-      .slice(markerIndex + 1)
-      .join('\n')
-      .trim(),
-  };
-}
-
-export function replaceGenerated(source: string, generated: string): string {
-  const { head } = splitSpec(source);
-  const next = `${head}\n\n${generated.trim()}\n`;
-
-  if (!next.startsWith(`${head}\n`)) {
-    throw new SpecFormatError(
-      'refusing to write: the operator section would not survive verbatim.',
-    );
-  }
-  return next;
+  assertDistinctLabels(section);
+  return section;
 }
 
 export function readEntries(head: string): string[] {
@@ -94,36 +57,39 @@ function assertDistinctLabels(head: string): void {
 }
 
 /**
- * How the last generated section fared under review. A rejected one is regenerated without anyone
- * having to pass `--force`: the point of the gate is "what we have is good", not merely "we already
- * ran once against this input".
+ * How the last enrichment fared under review. A rejected one is regenerated without anyone having to
+ * pass `--force`: the point of the gate is "what we have is good", not merely "we already ran once
+ * against this input".
  */
-export function readStatus(generated: string): string {
-  return /^status:\s*(\S+)$/m.exec(generated)?.[1] ?? 'draft';
+export function readStatus(enriched: string): string {
+  return /^status:\s*(\S+)$/m.exec(enriched)?.[1] ?? 'draft';
 }
 
-/** Flips the verdict line in place, leaving the rest of the generated section untouched. */
-export function setStatus(source: string, status: string): string {
-  const { head, generated } = splitSpec(source);
-  const next = /^status:\s*\S+$/m.test(generated)
-    ? generated.replace(/^status:\s*\S+$/m, `status: ${status}`)
-    : generated.replace(/^(source-sha:.*)$/m, `$1\nstatus: ${status}`);
-
-  return `${head}\n\n${next.trim()}\n`;
+/** Flips the verdict line in place, leaving the rest of the enriched spec untouched. */
+export function setStatus(enriched: string, status: string): string {
+  const next = /^status:\s*\S+$/m.test(enriched)
+    ? enriched.replace(/^status:\s*\S+$/m, `status: ${status}`)
+    : enriched.replace(/^(source-sha:.*)$/m, `$1\nstatus: ${status}`);
+  return `${next.trim()}\n`;
 }
 
 /**
- * Identifies the whole spec — the operator's words and the generated half together — ignoring the
- * `status:` line, which verify writes itself and must not treat as a change worth re-reading.
+ * Identifies the whole spec — what the operator wrote, the enriched spec and the ACCS files — ignoring
+ * the `status:` line, which verify writes itself and must not treat as a change worth re-reading. The
+ * ACCS belongs in it: a verdict on an old script says nothing about a repaired one.
  */
-export function specSha(source: string): string {
-  const { head, generated } = splitSpec(source);
-  const body = generated.replace(/^status:\s*\S+$/m, '');
+export function specSha(
+  operatorSection: string,
+  accs: string,
+  enriched: string,
+  accsFiles: string,
+): string {
+  const body = enriched.replace(/^status:\s*\S+$/m, '');
+  return hash(`${sourceSha(operatorSection, accs)}\n${normalise(body)}\n${accsFiles}`);
+}
 
-  return createHash('sha256')
-    .update(normaliseHead(`${head}\n${body}`))
-    .digest('hex')
-    .slice(0, 12);
+function hash(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 12);
 }
 
 /**

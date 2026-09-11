@@ -1,19 +1,16 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import type { EnrichedBody } from './schemas/Enrichment.js';
+import { METRICS_DIR } from './metrics.js';
+import type { AccsFiles } from './schemas/Accs.js';
 
 export const ACCS_SCRIPT = 'accs.bash';
+export const ENRICHED_SPEC = 'enriched-spec.md';
 
 export class SpecFileEscapeError extends Error {}
 
 /**
- * A generated file may only land inside its own spec's directory. The model chooses these paths,
- * so they are treated as untrusted: anything absolute, or reaching outside via `..`, is refused
- * rather than sanitised.
- */
-/**
  * The prompt shows the model a repo-root path for the ACCS, so it answers with repo-root
- * paths. Accept either that or a spec-relative one rather than rejecting a good result over a
+ * paths. Accept either that or an output-relative one rather than rejecting a good result over a
  * convention the prompt itself blurred.
  */
 export function normaliseGeneratedPath(specDir: string, candidate: string): string {
@@ -21,6 +18,12 @@ export function normaliseGeneratedPath(specDir: string, candidate: string): stri
   return candidate.startsWith(prefix) ? candidate.slice(prefix.length) : candidate;
 }
 
+/**
+ * A generated file may only land inside its spec's output directory, and never on top of the
+ * enriched spec or the metrics the tool keeps there. The model chooses these paths, so they are
+ * treated as untrusted: anything absolute, reaching outside via `..`, or reserved, is refused rather
+ * than sanitised.
+ */
 export function resolveGeneratedPath(specDir: string, candidate: string): string {
   if (isAbsolute(candidate)) {
     throw new SpecFileEscapeError(
@@ -33,7 +36,12 @@ export function resolveGeneratedPath(specDir: string, candidate: string): string
 
   if (inside.startsWith('..') || isAbsolute(inside)) {
     throw new SpecFileEscapeError(
-      `refusing to write "${candidate}": it resolves outside the spec's own directory.`,
+      `refusing to write "${candidate}": it resolves outside the spec's output directory.`,
+    );
+  }
+  if (inside === ENRICHED_SPEC || inside === METRICS_DIR || inside.startsWith(`${METRICS_DIR}/`)) {
+    throw new SpecFileEscapeError(
+      `refusing to write "${candidate}": ${inside} is kept by the tool, not generated.`,
     );
   }
   return target;
@@ -44,7 +52,7 @@ export function resolveGeneratedPath(specDir: string, candidate: string): string
  * anything under `src/` means it invented an interface the operator never specified, and a check
  * bound to internals can pass while the entrypoint is broken.
  */
-export function assertBlackBox(files: EnrichedBody['files']): void {
+export function assertBlackBox(files: AccsFiles['files']): void {
   const offenders = files.filter((file) => /(^|[^\w-])src\//.test(file.content));
   if (offenders.length === 0) return;
 
@@ -54,7 +62,7 @@ export function assertBlackBox(files: EnrichedBody['files']): void {
   );
 }
 
-export function assertTestScriptPresent(specDir: string, files: EnrichedBody['files']): void {
+export function assertTestScriptPresent(specDir: string, files: AccsFiles['files']): void {
   if (files.some((file) => normaliseGeneratedPath(specDir, file.path) === ACCS_SCRIPT)) return;
 
   throw new SpecFileEscapeError(
@@ -65,7 +73,7 @@ export function assertTestScriptPresent(specDir: string, files: EnrichedBody['fi
 
 export async function writeGeneratedFiles(
   specDir: string,
-  files: EnrichedBody['files'],
+  files: AccsFiles['files'],
 ): Promise<string[]> {
   assertTestScriptPresent(specDir, files);
   assertBlackBox(files);

@@ -25,6 +25,8 @@ export interface Verification {
   mustFix: Finding[];
   shouldFix: Finding[];
   shouldKnow: Finding[];
+  /** What the verifier says has to be redone. Records older than this field count as 'spec'. */
+  fix?: 'spec' | 'accs';
   effectiveTokens: number;
   /** The spec this verdict is about, so verifying twice over unchanged content costs once. */
   specSha: string;
@@ -146,4 +148,13 @@ export async function amendMetrics(
   await writeFile(path, `${JSON.stringify({ ...existing, ...patch }, null, 2)}\n`, 'utf8');
 
   return path;
+}
+
+/** The verdict on record for the latest run, when there is one. */
+export async function readLastVerification(outputDir: string): Promise<Verification | null> {
+  const path = await latestMetricsPath(outputDir);
+  if (!path) return null;
+
+  const record = JSON.parse(await readFile(path, 'utf8')) as EnrichMetrics;
+  return record.verification ?? null;
 }
