@@ -20,7 +20,7 @@ The exceptions from this rule are the specfiles, which have human headers but th
 
 Readonly Fake GitHub Service:
   - Lightweight always-on process that serves a selection of GitHub-like API endpoints. 
-  Upon startup, it loads a state from a collection of AI-generated mock-data. 60% of data is loaded on startup, the rest is being loaded linearly in the next 3 minutes. The state is stored in memory. Fetching something after a few seconds from startup will yield different results that it would after 2 minutes since launch. 
+  Upon startup, it loads a state from a collection of AI-generated mock-data. 60% of data is loaded on startup, the rest is being loaded linearly in the next 10 seconds. The state is stored in memory. Fetching something after a few seconds from startup will yield different results that it would after 5 seconds since launch. 
 
 In-Memory Stateful Fake GitHub Service:
   - Next iteration of Readonly Fake GitHub Services. This one exposes a simple mutational endpoint that allows the client to write a comment inside an issue. The data is still stored in memory, terminating the process will still result in data loss.
@@ -139,6 +139,7 @@ Specs Enrichment Specialist:
 - Feel free to make your own decisions where the matter is not obvious, but always list the decisions made.
 - You can block the enrichment if you find something from the What I Want section impossible to achieve, contradictory, or seriously needing more thought or context. Make it last resort though. Vetoing is much more problematic than leaving feedback that can be resolved in the next human iteration.
 - You write behavioral ACCS that also enforces the contract on the implementation. Dev agent implementation will be tested against it. This script will essentially verify if the implementation is complete and whether or not the specification can be reapplied or if there is no need for it. Think terraform apply if there are no more changes to be made. ACCS passing mean that implementation is complete and only adding something to the What I Want would invalidate it. So make sure that green means "the current world state is synced with the spec's desired world state".
+- Make sure that the ACCS implementation is loyal to the accs.md
 - Dev agent has to obey the spec you write. It will make no more and no less than you tell it to. Do not leave any open questions without defaults. 
 - Loopholes you introduce are final and even if the dev agent discovers one, it will ignore it and consider it a part of your plan.
 
@@ -147,11 +148,11 @@ Specs Verification Specialist:
 - Read Boundaries - for specId specs/{specId-...}/*
 - Write Boundaries - for specId specs/{specId-...}/spec.md (Status only)
 - Report stored in metrics (for specId specs/{specId-...}/metrics/) 
-- Your job is to verify the enrichment. 
+- Your job is to verify the enrichment - both for the spec.md and the accs.md
 - You assess if the AI-generated spec sections stray from the man-made one. 
-- You verify if the spec ACCS is properly written and may serve as idempotency guard for the spec-implementation process. 
+- You verify if the ACCS is properly implemented and may serve as idempotency guard for the spec-implementation process. Assure it the accs implementation is loyal to the accs.md
 - You verify if the spec is exhaustive enough for the project. The agent that gets the spec will perform each step of the spec without looking at the loopholes, even if it falls in one. 
-- Block if ACCS script is invalid. If it's written badly and won't ever execute, dev agent may become stuck on it indefinitely.
+- Block if ACCS script implementation is invalid. If it's written badly and won't ever execute, dev agent may become stuck on it indefinitely.
 
 Specs Implementation Specialist:
 - Read/Write Boundaries: src/harness/* + src/mock-github/* + src/issue-tracker/* + tests/* 
@@ -166,9 +167,11 @@ Specs Implementation Specialist:
 
 ##### Acceptance Criteria Check Script
 The script that verifies if the spec implementation is compliant with the idea behind the spec. Answers the question - "Does the current world state reflect the desired state of the world, as specified in this spec"?
-  DO NOT confuse it with vitest unit tests, integration tests or even e2e tests. 
-  It's a bash scripts that the implementation is to be built around, not the test suite that tests the implementation. THAT DOES NOT NEGATE THE NEED FOR REGULAR TESTING!
-  ACCS is not supposed to run regular tests. Tests are measuring technical reliability, ACCS is measuring business completeness.  
-  When writing ACCS, don't assume the code that could exist after the implementation. Implementation is ALWAYS non-deterministic, aiming blindly for imaginary hooks won't do. BDT (Behavior Driven Testing) concepts translate very well to the ACCS design thinking, because the assumptions it relies are based on abstractions, not physical components.
-  ACCS may return one of 3 results. 0 - the world matches the spec. 1 - it doesn't, there is a misalignment. 2 - I didn't even manage to make that decision. Let the human decide.
-  It may not name anything inside src. You can use commands from package.json, .env vars, HTTP endpoints, stdout, stderr or other non-code-explicit sources.
+
+- accs.md is written in prose by a human, and is then implemented by enrichment. With each iteration, accs.md is edited in place, artifacts are removed and recreated.
+- DO NOT confuse it with vitest unit tests, integration tests or even e2e tests. 
+- It's a bash scripts that the implementation is to be built around, not the test suite that tests the implementation. THAT DOES NOT NEGATE THE NEED FOR REGULAR TESTING!
+- ACCS is not supposed to run regular tests. Tests are measuring technical reliability, ACCS is measuring business completeness.  
+- When writing ACCS, don't assume the code that could exist after the implementation. Implementation is ALWAYS non-deterministic, aiming blindly for imaginary hooks won't do. BDT (Behavior Driven Testing) concepts translate very well to the ACCS design thinking, because the assumptions it relies are based on abstractions, not physical components.
+- ACCS may return one of 2 results. 0 - the world matches the spec. 1 - it doesn't, there is a misalignment or the script is invalid.
+- It may not name anything inside src. You can use commands from package.json, .env vars, HTTP endpoints, stdout, stderr or other non-code-explicit sources.

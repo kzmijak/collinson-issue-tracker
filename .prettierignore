@@ -3,14 +3,14 @@
 # them rewrites evidence that is supposed to stay byte-stable.
 specs/*/metrics/
 
-# Same reasoning for the spec itself: its generated half is written by `pnpm enrich` and the table
-# padding it emits varies per run, so format:check would go red on a file nobody is allowed to edit.
-specs/*/spec.md
+# Same reasoning for everything else in a spec's directory: the generated half of spec.md, the ACCS
+# and its helpers are all written by `pnpm enrich`, so format:check would go red on files nobody is
+# allowed to edit.
+specs/*/
 
 node_modules
 dist
 pnpm-lock.yaml
 
-# Hand-written prompts, distributed verbatim. Reformatting would alter text no AI may edit.
-CONCEPT.md
+# Hand-written prompts. Reformatting would alter text no AI may edit.
 .ai/

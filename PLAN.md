@@ -1,6 +1,6 @@
 # Plan
 
-What the system is, the roadmap stages and the rules of the method live in `CONCEPT.md`, which is
+What the system is, the roadmap stages and the rules of the method live in `.ai/context.md`, which is
 written by hand. This file doesn't restate any of it. It tracks where the work stands and records how
 the plan changed.
 

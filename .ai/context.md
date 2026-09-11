@@ -11,7 +11,7 @@
 
 Readonly Fake GitHub Service:
   - Lightweight always-on process that serves a selection of GitHub-like API endpoints. 
-  Upon startup, it loads a state from a collection of AI-generated mock-data. 60% of data is loaded on startup, the rest is being loaded linearly in the next 3 minutes. The state is stored in memory. Fetching something after a few seconds from startup will yield different results that it would after 2 minutes since launch. 
+  Upon startup, it loads a state from a collection of AI-generated mock-data. 60% of data is loaded on startup, the rest is being loaded linearly in the next 10 seconds. The state is stored in memory. Fetching something after a few seconds from startup will yield different results that it would after 5 seconds since launch. 
 
 In-Memory Stateful Fake GitHub Service:
   - Next iteration of Readonly Fake GitHub Services. This one exposes a simple mutational endpoint that allows the client to write a comment inside an issue. The data is still stored in memory, terminating the process will still result in data loss.
@@ -109,9 +109,11 @@ Common rules:
 
 ##### Acceptance Criteria Check Script
 The script that verifies if the spec implementation is compliant with the idea behind the spec. Answers the question - "Does the current world state reflect the desired state of the world, as specified in this spec"?
-  DO NOT confuse it with vitest unit tests, integration tests or even e2e tests. 
-  It's a bash scripts that the implementation is to be built around, not the test suite that tests the implementation. THAT DOES NOT NEGATE THE NEED FOR REGULAR TESTING!
-  ACCS is not supposed to run regular tests. Tests are measuring technical reliability, ACCS is measuring business completeness.  
-  When writing ACCS, don't assume the code that could exist after the implementation. Implementation is ALWAYS non-deterministic, aiming blindly for imaginary hooks won't do. BDT (Behavior Driven Testing) concepts translate very well to the ACCS design thinking, because the assumptions it relies are based on abstractions, not physical components.
-  ACCS may return one of 3 results. 0 - the world matches the spec. 1 - it doesn't, there is a misalignment. 2 - I didn't even manage to make that decision. Let the human decide.
-  It may not name anything inside src. You can use commands from package.json, .env vars, HTTP endpoints, stdout, stderr or other non-code-explicit sources.
+
+- accs.md is written in prose by a human, and is then implemented by enrichment. With each iteration, accs.md is edited in place, artifacts are removed and recreated.
+- DO NOT confuse it with vitest unit tests, integration tests or even e2e tests. 
+- It's a bash scripts that the implementation is to be built around, not the test suite that tests the implementation. THAT DOES NOT NEGATE THE NEED FOR REGULAR TESTING!
+- ACCS is not supposed to run regular tests. Tests are measuring technical reliability, ACCS is measuring business completeness.  
+- When writing ACCS, don't assume the code that could exist after the implementation. Implementation is ALWAYS non-deterministic, aiming blindly for imaginary hooks won't do. BDT (Behavior Driven Testing) concepts translate very well to the ACCS design thinking, because the assumptions it relies are based on abstractions, not physical components.
+- ACCS may return one of 2 results. 0 - the world matches the spec. 1 - it doesn't, there is a misalignment or the script is invalid.
+- It may not name anything inside src. You can use commands from package.json, .env vars, HTTP endpoints, stdout, stderr or other non-code-explicit sources.

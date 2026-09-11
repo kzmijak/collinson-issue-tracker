@@ -1,6 +1,5 @@
-<!-- Copy to specs/NNN-<slug>/spec.md, delete this comment, fill in What I want,
-     then run `pnpm enrich NNN`. Everything below the generated marker is written by the
-     tool and must not be edited by hand. How the method works: CONCEPT.md. -->
+<!-- Copy to specs/NNN-<slug>/spec.md, delete this comment, fill in What I want, write accs.md
+     next to it, then run `pnpm enrich NNN`. How the method works: .ai/context.md. -->
 
 # NNN — <title>
 
@@ -18,5 +17,3 @@ decides and lists as a decision.>
      an entry that is already here: it is the record of what was decided and when. Two entries may
      share a date — order comes from position in the file. Give each a distinct label; two
      identical headings are an error. -->
-
-<!-- enrich:generated — everything below is written by `pnpm enrich`; do not edit by hand -->

@@ -4,7 +4,9 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'notes/**', '.claude/**'] },
+  // specs/ holds files `pnpm enrich` writes and nobody may edit by hand, so a lint error there has
+  // no one to fix it.
+  { ignores: ['dist/**', 'node_modules/**', '.claude/**', 'specs/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,
