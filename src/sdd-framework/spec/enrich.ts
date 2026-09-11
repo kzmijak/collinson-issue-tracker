@@ -8,6 +8,8 @@ import { renderSpec } from './renderSpec.js';
 import { readEntries, readSectionItems, readStatus } from './SpecFile.js';
 import { readSpecFolder, specPaths, withoutMeta } from './specFolder.js';
 import { pruneOrphans, readPreviousFiles, writeGeneratedFiles } from './specFiles.js';
+import { enrichReport, latestReport, writeReport, type ReportRun } from './reports.js';
+import { specName } from './resolveSpecPath.js';
 
 export type EnrichResult =
   | {
@@ -18,9 +20,16 @@ export type EnrichResult =
       /** True when a reviewer's verdict was in front of the enricher for this run. */
       corrected: boolean;
       effectiveTokens: number;
+      report: string;
     }
-  | { status: 'unchanged'; openQuestions: string[]; assumptions: string[] }
-  | { status: 'blocked'; blocking: string[]; effectiveTokens: number };
+  | {
+      status: 'unchanged';
+      openQuestions: string[];
+      assumptions: string[];
+      /** The previous run's report, handed back instead of a new one. */
+      lastReport: string | null;
+    }
+  | { status: 'blocked'; blocking: string[]; effectiveTokens: number; report: string };
 
 export interface EnrichContext {
   model: string;
@@ -55,6 +64,13 @@ export async function enrich(
   let calling: 'enricher' | 'accs-author' | null = null;
 
   /** A call that threw still spent what its client recorded, so it is counted, not lost. */
+  const reportRun = (): ReportRun => ({
+    spec: specName(path),
+    at: new Date(startedAt).toISOString(),
+    durationMs: Date.now() - startedAt,
+    effectiveTokens: spent,
+  });
+
   const settle = () => {
     if (calling === 'enricher') spent = enricher.lastEffectiveTokens;
     if (calling === 'accs-author') spent += accsAuthor.lastEffectiveTokens;
@@ -100,6 +116,7 @@ export async function enrich(
       await record('unchanged');
       return {
         status: 'unchanged',
+        lastReport: await latestReport(paths.output, 'enrich'),
         openQuestions: readSectionItems(generated, 'Open questions'),
         assumptions: readSectionItems(generated, 'Assumptions taken'),
       };
@@ -107,7 +124,7 @@ export async function enrich(
 
     calling = 'enricher';
     const enrichment = await enricher.prompt(
-      new EnrichPrompt(folder.operatorSection, folder.accs, mode, paths.accsScript, feedback),
+      new EnrichPrompt(folder.operatorSection, folder.accs, mode, feedback),
       { fresh: true },
     );
     settle();
@@ -119,7 +136,13 @@ export async function enrich(
 
     if (enrichment.blocking.length > 0 || !enrichment.body) {
       await record('blocked', { counts: { blocking: enrichment.blocking.length } });
-      return { status: 'blocked', blocking: enrichment.blocking, effectiveTokens: spent };
+      const report = await writeReport(
+        paths.output,
+        'enrich',
+        new Date().toISOString(),
+        enrichReport(reportRun(), { status: 'blocked', designFlaws: enrichment.blocking }),
+      );
+      return { status: 'blocked', blocking: enrichment.blocking, effectiveTokens: spent, report };
     }
 
     const meta = {
@@ -146,6 +169,12 @@ export async function enrich(
     await mkdir(paths.output, { recursive: true });
     await writeFile(paths.enriched, body, 'utf8');
     await record('written', { files, pruned, counts: countsOf(enrichment.body, files) });
+    const report = await writeReport(
+      paths.output,
+      'enrich',
+      new Date().toISOString(),
+      enrichReport(reportRun(), { status: 'written', spec: enrichment.body, accsFlow: accs.flow }),
+    );
 
     return {
       status: 'written',
@@ -154,6 +183,7 @@ export async function enrich(
       pruned,
       corrected: Boolean(feedback),
       effectiveTokens: spent,
+      report,
     };
   }
 }

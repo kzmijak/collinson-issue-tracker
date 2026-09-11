@@ -7,6 +7,8 @@ import { VerifyPrompt } from './VerifyPrompt.js';
 import type { Verdict } from './schemas/Verdict.js';
 import { setStatus, specSha } from './SpecFile.js';
 import { describeSpec, isStale, readSpecFolder } from './specFolder.js';
+import { latestReport, verifyReport, writeReport } from './reports.js';
+import { specName } from './resolveSpecPath.js';
 
 export const REVIEWER_DEFINITION = '.ai/identities/verifier.md';
 
@@ -15,11 +17,16 @@ export interface VerifyResult extends Verdict {
   attachedTo: string | null;
   /** True when this verdict was read from the record rather than paid for again. */
   reused: boolean;
+  /** Where this run's report was written; null when the verdict was reused. */
+  report: string | null;
+  /** For a reused verdict, the report of the run that paid for it. */
+  lastReport?: string | null;
 }
 
 export class StaleEnrichmentError extends Error {}
 
 export async function verify(path: string, llm: Llm, force = false): Promise<VerifyResult> {
+  const startedAt = Date.now();
   const folder = await readSpecFolder(path);
   const { output } = folder.paths;
 
@@ -34,7 +41,17 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
   const sha = specSha(folder.operatorSection, folder.accs, folder.enriched, artefacts);
 
   const stored = force ? null : await storedVerdict(output, sha);
-  if (stored) return { ...stored, effectiveTokens: 0, attachedTo: null, reused: true };
+  if (stored) {
+    const lastReport = await latestReport(output, 'verify');
+    return {
+      ...stored,
+      effectiveTokens: 0,
+      attachedTo: null,
+      reused: true,
+      report: null,
+      lastReport,
+    };
+  }
 
   const instructions = readAgentPrompt(REVIEWER_DEFINITION, { without: ['Output format'] });
 
@@ -62,7 +79,22 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
       },
     });
 
-    return { ...verdict, effectiveTokens, attachedTo, reused: false };
+    const report = await writeReport(
+      output,
+      'verify',
+      new Date().toISOString(),
+      verifyReport(
+        {
+          spec: specName(path),
+          at: new Date(startedAt).toISOString(),
+          durationMs: Date.now() - startedAt,
+          effectiveTokens,
+        },
+        verdict,
+      ),
+    );
+
+    return { ...verdict, effectiveTokens, attachedTo, reused: false, report };
   } catch (error) {
     // The client records usage as soon as its query returns, before parsing can reject the shape —
     // so a call that threw here still spent real tokens, and losing that number on top of the
@@ -87,5 +119,6 @@ async function storedVerdict(outputDir: string, sha: string): Promise<Verdict | 
   const record = JSON.parse(await readFile(path, 'utf8')) as EnrichMetrics;
   const previous = record.verification;
 
-  return previous?.specSha === sha ? { ...previous, fix: previous.fix ?? 'spec' } : null;
+  if (previous?.specSha !== sha) return null;
+  return { ...previous, fix: previous.fix === 'accs' ? 'accs' : 'full' };
 }

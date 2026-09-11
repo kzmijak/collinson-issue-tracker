@@ -74,7 +74,7 @@ function spec(
 describe('enrichAccs', () => {
   it('refuses cheaply, without calling the model, when the last verdict named no gaps', async () => {
     const { path } = spec([], []);
-    const llm = new FakeLlm({ files: [{ path: 'accs.bash', content: 'echo PASS\n' }] });
+    const llm = new FakeLlm({ files: [{ path: 'accs.bash', content: 'echo PASS\n' }], flow: [] });
 
     const result = await enrichAccs(path, llm, { model: 'claude-sonnet-5' });
 
@@ -88,6 +88,7 @@ describe('enrichAccs', () => {
     ]);
     const llm = new FakeLlm({
       files: [{ path: 'accs.bash', content: '#!/usr/bin/env bash\necho PASS\n' }],
+      flow: ['start the tracker', 'check it prints the issues'],
     });
 
     const result = await enrichAccs(path, llm, { model: 'claude-sonnet-5' });

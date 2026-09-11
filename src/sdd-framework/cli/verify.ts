@@ -149,7 +149,8 @@ const AGENTS_BY_STEP: Record<LoopStepKind, (agents: Agents) => Agents[keyof Agen
 function outcomeOf(result: EnrichResult | EnrichAccsResult | VerifyResult): string {
   if ('verdict' in result) {
     const verdict = result.reused ? `${result.verdict}, reused` : result.verdict;
-    return result.verdict === 'rejected' ? `${verdict} — next: redo the ${result.fix}` : verdict;
+    if (result.verdict !== 'rejected') return verdict;
+    return `${verdict} — next: ${result.fix === 'accs' ? 'fix the ACCS' : 'full rewrite'}`;
   }
   return result.status;
 }
@@ -167,13 +168,10 @@ function report(result: VerifyResult, subject: string): void {
   section('Should fix', result.shouldFix.map(asItem), '-', 'yellow');
   section('Worth knowing', result.shouldKnow.map(asItem), 'i', 'blue');
 
-  if (!result.reused) {
-    note(
-      result.attachedTo
-        ? `recorded in ${result.attachedTo}`
-        : 'no enrichment record to attach this to — the spec predates metrics',
-    );
+  if (result.reused && result.lastReport) {
+    consoleLogger.info(`\n${result.lastReport}`);
   }
+  if (result.report) note(`report: ${result.report}`);
 }
 
 function asItem(finding: Finding) {

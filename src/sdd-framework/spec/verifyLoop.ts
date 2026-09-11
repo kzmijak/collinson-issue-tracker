@@ -70,7 +70,7 @@ export async function verifyLoop(
     if (isStale(folder)) {
       if ((await runEnrich(turn)).status === 'blocked') return blocked(turn);
     } else if (rejected) {
-      const fix = (await readLastVerification(folder.paths.output))?.fix ?? 'spec';
+      const fix = (await readLastVerification(folder.paths.output))?.fix;
 
       if (fix === 'accs') {
         const result = await around(turn, 'fix-accs', () =>

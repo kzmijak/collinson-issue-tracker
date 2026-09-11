@@ -1,4 +1,5 @@
 import type { EnrichedBody } from './schemas/Enrichment.js';
+import { ACCS_SCRIPT } from './specFiles.js';
 
 export type VerificationStatus = 'draft' | 'approved' | 'rejected';
 
@@ -18,6 +19,14 @@ export function renderSpec(body: EnrichedBody, meta: SpecMeta): string {
     body.summary,
     '',
     renderRows(body),
+    '## Contract',
+    '',
+    'The facades the ACCS may rely on — nothing else about the implementation can be assumed.',
+    '',
+    '| facade | promise |',
+    '| ------ | ------- |',
+    ...body.contract.map(({ facade, promise }) => `| ${facade} | ${promise} |`),
+    '',
     renderOpenQuestions(body.openQuestions),
     renderAssumptions(body.assumptions),
     '## Done when',
@@ -26,14 +35,6 @@ export function renderSpec(body: EnrichedBody, meta: SpecMeta): string {
     '',
     '## Behaviour',
     ...body.behaviours.flatMap(renderBehaviour),
-    '',
-    '## Acceptance check',
-    '',
-    '```',
-    body.acceptance.command,
-    '```',
-    '',
-    body.acceptance.expectation,
     '',
     '## Decisions already made',
     '',
@@ -63,8 +64,7 @@ function renderRows(body: EnrichedBody): string {
   return [
     '|              |     |',
     '| ------------ | --- |',
-    `| **Check**    | ${body.check} |`,
-    `| **Proves**   | ${body.proves} |`,
+    `| **Check**    | \`bash output/${ACCS_SCRIPT}\` |`,
     `| **Numbers**  | ${body.numbers} |`,
     `| **Not this** | ${body.notThis} |`,
     '',

@@ -7,11 +7,22 @@ const specCase = z.object({
 
 export const enrichedBodySchema = z.object({
   summary: z.string().min(1).describe('one sentence, present tense, what this does'),
-  check: z
-    .string()
+  contract: z
+    .array(
+      z.object({
+        facade: z
+          .string()
+          .min(1)
+          .describe(
+            'exactly as the ACCS will use it: a command, an environment variable, an HTTP endpoint, the format of an output line, a file',
+          ),
+        promise: z.string().min(1).describe('what the implementation guarantees about it'),
+      }),
+    )
     .min(1)
-    .describe('exactly `bash <the ACCS path from the message>`, nothing else'),
-  proves: z.string().min(1).describe('what passing demonstrates, with counts'),
+    .describe(
+      'every facade the ACCS may rely on — the only things it may assume about the implementation',
+    ),
   numbers: z
     .string()
     .min(1)
@@ -30,10 +41,6 @@ export const enrichedBodySchema = z.object({
       }),
     )
     .min(1),
-  acceptance: z.object({
-    command: z.string().min(1).describe('the command that runs the ACCS'),
-    expectation: z.string().min(1).describe('what that command does when the spec is satisfied'),
-  }),
   decisions: z.array(
     z.object({
       decision: z.string().min(1).describe('what was decided'),
@@ -44,6 +51,10 @@ export const enrichedBodySchema = z.object({
   openQuestions: z
     .array(z.string().min(1).describe('a question with your recommendation, settled by yes or no'))
     .describe('at most three'),
+  drawbacks: z
+    .array(z.string().min(1).describe('a weakness of the chosen design, and what it costs'))
+    .default([])
+    .describe('expected drawbacks; empty when there are none'),
   assumptions: z.array(
     z.object({
       question: z.string().min(1).describe('what the prose did not settle'),
@@ -53,7 +64,9 @@ export const enrichedBodySchema = z.object({
 });
 
 export const enrichmentSchema = z.object({
-  blocking: z.array(z.string().min(1).describe('a question that stops work, and why it stops it')),
+  blocking: z.array(
+    z.string().min(1).describe('a design flaw in spec.md that stops work, and why it stops it'),
+  ),
   body: enrichedBodySchema.nullable().describe('null when "blocking" is not empty'),
 });
 

@@ -37,12 +37,12 @@ export const verdictSchema = z.object({
     .array(softFindingSchema)
     .describe('not a defect: a choice made alone, or coverage the ACCS does not reach'),
   fix: z
-    .enum(['spec', 'accs'])
+    .enum(['full', 'accs'])
     .describe(
-      "what has to be redone when rejected — 'spec': the enriched spec must change, which rebuilds the ACCS too; 'accs': only the ACCS fails to honour accs.md or the enriched spec's contract",
+      "the range of fire when rejected — 'full': the enriched spec is flawed, so it is rewritten and the ACCS rebuilt with it; 'accs': fixing the ACCS suite alone is enough",
     )
-    // Missing means the safe route: regenerating both is never wrong, only more expensive.
-    .default('spec'),
+    // Missing means the safe route: a full rewrite is never wrong, only more expensive.
+    .default('full'),
 });
 
 export type Verdict = z.infer<typeof verdictSchema>;

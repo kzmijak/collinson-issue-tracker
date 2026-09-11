@@ -3,13 +3,13 @@ import { EnrichPrompt, ModelContractError } from '../../../src/sdd-framework/spe
 
 const body = {
   summary: 'x',
-  check: 'bash accs.bash',
-  proves: 'x',
+  contract: [
+    { facade: '`pnpm start` prints `#<n> <title>` per issue', promise: 'one line per open issue' },
+  ],
   numbers: 'x',
   notThis: 'x',
   doneWhen: ['x'],
   behaviours: [{ name: 'x', cases: [{ input: 'a', expected: 'b' }] }],
-  acceptance: { command: 'bash accs.bash', expectation: 'exits 0' },
   decisions: [{ decision: 'x', why: 'y' }],
   outOfScope: ['x'],
   openQuestions: ['already here'],

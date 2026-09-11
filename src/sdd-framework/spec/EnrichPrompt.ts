@@ -43,7 +43,6 @@ export class EnrichPrompt extends JsonPrompt<Enrichment> {
     private readonly operatorSection: string,
     private readonly accs: string,
     private readonly mode: EnrichMode = 'default',
-    private readonly accsPath = 'accs.bash',
     private readonly feedback?: Feedback,
   ) {
     super();
@@ -54,8 +53,6 @@ export class EnrichPrompt extends JsonPrompt<Enrichment> {
       ...(this.mode === 'no-questions'
         ? ['MODE: --no-questions. "blocking" and "openQuestions" must be empty arrays.', '']
         : []),
-      `The ACCS will be written to \`${this.accsPath}\`.`,
-      '',
       ...(this.feedback ? correctionBrief(this.feedback) : []),
       'Here is the operator section of a specification. Expand it.',
       '',

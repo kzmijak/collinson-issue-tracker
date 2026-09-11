@@ -35,13 +35,11 @@ const enriched = {
   blocking: [],
   body: {
     summary: 'x',
-    check: 'bash output/accs.bash',
-    proves: 'x',
+    contract: [{ facade: '`pnpm start`', promise: 'prints issues' }],
     numbers: 'x',
     notThis: 'x',
     doneWhen: ['x'],
     behaviours: [{ name: 'x', cases: [{ input: 'a', expected: 'b' }] }],
-    acceptance: { command: 'bash output/accs.bash', expectation: 'exits 0' },
     decisions: [],
     outOfScope: [],
     openQuestions: [],
@@ -52,7 +50,7 @@ const enriched = {
 const accs = { files: [{ path: 'accs.bash', content: 'exit 0\n', executable: true }] };
 const fixedAccs = { files: [{ path: 'accs.bash', content: 'echo fixed\n', executable: true }] };
 
-function rejected(fix: 'spec' | 'accs') {
+function rejected(fix: 'full' | 'accs') {
   return {
     verdict: 'rejected',
     summary: 'the ACCS passes on noise',
@@ -69,7 +67,7 @@ const approved = {
   mustFix: [],
   shouldFix: [],
   shouldKnow: [],
-  fix: 'spec',
+  fix: 'full',
 };
 
 function output(path: string, name: string): string {
@@ -84,7 +82,7 @@ describe('verifyLoop', () => {
     const agents = {
       enricher: new ScriptedLlm([enriched]),
       accsAuthor: new ScriptedLlm([accs]),
-      verifier: new ScriptedLlm([rejected('spec'), approved]),
+      verifier: new ScriptedLlm([rejected('full'), approved]),
     };
     const steps: string[] = [];
 
@@ -127,7 +125,7 @@ describe('verifyLoop', () => {
     const agents = {
       enricher: new ScriptedLlm([enriched]),
       accsAuthor: new ScriptedLlm([accs]),
-      verifier: new ScriptedLlm([rejected('spec')]),
+      verifier: new ScriptedLlm([rejected('full')]),
     };
 
     const result = await verifyLoop(path, agents, { maxTurns: 2, enrich: context });

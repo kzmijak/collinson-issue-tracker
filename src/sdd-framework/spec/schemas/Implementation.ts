@@ -19,6 +19,10 @@ export const implementationSchema = z.object({
   picks: z
     .array(pickSchema)
     .describe('one entry per choice the spec left open; empty only if it decided everything'),
+  specIssues: z
+    .array(z.string().min(1).describe('a bug or loophole found in the spec or the ACCS, and where'))
+    .default([])
+    .describe('left for the operator to decide on; empty when there were none'),
   blocked: z
     .string()
     .describe('at most three sentences naming what conflicts with what')

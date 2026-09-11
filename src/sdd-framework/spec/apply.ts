@@ -10,6 +10,8 @@ import { readArtefacts } from './readArtefacts.js';
 import { runCheck, type CheckResult } from './runCheck.js';
 import { readStatus, specSha } from './SpecFile.js';
 import { describeSpec, isStale, readSpecFolder } from './specFolder.js';
+import { applyReport, writeReport } from './reports.js';
+import { specName } from './resolveSpecPath.js';
 
 export const IMPLEMENTER_DEFINITION = '.ai/identities/implementer.md';
 
@@ -44,6 +46,7 @@ export interface ApplyResult {
   usage: TokenUsage;
   attachedTo: string | null;
   detail?: string;
+  report?: string;
 }
 
 /**
@@ -162,6 +165,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
       summary: implementation?.summary ?? null,
       files: implementation?.files ?? [],
       picks: implementation?.picks ?? [],
+      specIssues: implementation?.specIssues ?? [],
       blocked: implementation?.blocked ?? null,
       effectiveTokens,
       effectiveTokenBudget: props.effectiveTokenBudget,
@@ -172,6 +176,21 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     },
   });
 
+  const report = await writeReport(
+    output,
+    'apply',
+    new Date().toISOString(),
+    applyReport(
+      {
+        spec: specName(path),
+        at: new Date(startedAt).toISOString(),
+        durationMs: Date.now() - startedAt,
+        effectiveTokens,
+      },
+      { status, rounds: round, implementation },
+    ),
+  );
+
   return {
     status,
     rounds: round,
@@ -180,6 +199,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     effectiveTokens,
     usage: llm.totalUsage,
     attachedTo,
+    report,
   };
 }
 

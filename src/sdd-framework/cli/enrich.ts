@@ -57,9 +57,13 @@ async function main(): Promise<number> {
 
   if (result.status === 'unchanged') {
     banner('UNCHANGED', 'dim', path);
-    paragraph(
-      'spec.md and accs.md have not changed and the last result was not rejected. What it left you:',
-    );
+    paragraph('spec.md and accs.md have not changed and the last result was not rejected.');
+    if (result.lastReport) {
+      consoleLogger.info(`\n${result.lastReport}`);
+      note('`--force` regenerates as-is.');
+      return 0;
+    }
+    paragraph('What the last run left you:');
 
     section(
       'Open questions',
@@ -87,6 +91,7 @@ async function main(): Promise<number> {
       'red',
     );
     note('Append a dated entry under `## What I want` that settles these, then run again.');
+    note(`report: ${result.report}`);
     return 1;
   }
 
@@ -111,6 +116,7 @@ async function main(): Promise<number> {
     '?',
     'yellow',
   );
+  note(`report: ${result.report}`);
   note(`Read the report before the spec: pnpm verify ${target}`);
   return 0;
 }
@@ -144,6 +150,7 @@ async function runAccsOnly(path: string, model: string, target: string): Promise
     '+',
     'green',
   );
+  if (result.report) note(`report: ${result.report}`);
   note(`Read the fix before trusting it: pnpm verify ${target}`);
   return 0;
 }

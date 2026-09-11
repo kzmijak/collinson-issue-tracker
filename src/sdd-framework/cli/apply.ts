@@ -36,8 +36,12 @@ const CHECK_TIMEOUT_MS = 300_000;
 /**
  * Not a narrowing of the toolset — every tool is available. Git writes are denied because
  * `settingSources: []` also keeps out the `PreToolUse` hook that normally guarantees history only
- * moves through the `git` agent, and this is the only mechanical barrier left. The identity carries
+ * moves through `pnpm commit`, and this is the only mechanical barrier left. The identity carries
  * the rule itself, because a pattern list cannot anticipate every spelling of it.
+ *
+ * specs/ is the operator's and the enrichment's, never the implementer's: one run added a file
+ * there to make the ACCS pass. .env holds live tokens: one run printed it into its transcript.
+ * A shell command can still reach both; these stop the direct tools.
  */
 const DENIED = [
   'Bash(git add:*)',
@@ -47,6 +51,10 @@ const DENIED = [
   'Bash(git checkout:*)',
   'Bash(git rebase:*)',
   'Bash(git stash:*)',
+  'Edit(./specs/**)',
+  'Write(./specs/**)',
+  'Read(./.env)',
+  'Bash(cat .env:*)',
 ];
 
 const IDENTITY =
@@ -172,14 +180,18 @@ function report(result: ApplyResult, spec: string, budget: number): number {
     'yellow',
   );
 
+  section(
+    'Bugs and loopholes in the spec or the ACCS',
+    (result.implementation?.specIssues ?? []).map((issue) => ({ body: issue })),
+    '!',
+    'red',
+  );
+
   if (!converged && result.check) showOutput(result.check.output);
 
   const rest = picks.length - PICKS_SHOWN;
-  note(
-    result.attachedTo
-      ? `${rest > 0 ? `${rest} more picks, and the full reasoning, in ` : 'recorded in '}${result.attachedTo}`
-      : 'no enrichment record to attach this to — the spec predates metrics',
-  );
+  if (rest > 0) note(`${rest} more picks, with the reasoning, in the report`);
+  if (result.report) note(`report: ${result.report}`);
 
   if (converged) note('Nothing is staged. Review the tree, then `pnpm commit`.');
 

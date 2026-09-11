@@ -25,8 +25,8 @@ export interface Verification {
   mustFix: Finding[];
   shouldFix: Finding[];
   shouldKnow: Finding[];
-  /** What the verifier says has to be redone. Records older than this field count as 'spec'. */
-  fix?: 'spec' | 'accs';
+  /** What the verifier says has to be redone. Anything but 'accs' — older records included — is 'full'. */
+  fix?: 'full' | 'accs' | 'spec';
   effectiveTokens: number;
   /** The spec this verdict is about, so verifying twice over unchanged content costs once. */
   specSha: string;
@@ -43,6 +43,7 @@ export interface Application {
   summary: string | null;
   files: string[];
   picks: ImplementationPick[];
+  specIssues: string[];
   blocked: string | null;
   effectiveTokens: number;
   /** The ceiling the run was given, so an overshoot is visible rather than needing recomputing. */
@@ -116,7 +117,7 @@ function labelOf(entry: string | null): string {
   return entry?.replace(/^\d{4}-\d{2}-\d{2}\s*[—-]\s*/, '') ?? 'no-entry';
 }
 
-function fileStamp(iso: string): string {
+export function fileStamp(iso: string): string {
   return iso.replace(/\.\d+/, '').replace(/:/g, '-');
 }
 

@@ -5,6 +5,8 @@ import { readEntries, setStatus } from './SpecFile.js';
 import { isStale, readSpecFolder, withoutMeta } from './specFolder.js';
 import { AccsCorrectionPrompt } from './AccsPrompt.js';
 import { writeGeneratedFiles } from './specFiles.js';
+import { accsFixReport, writeReport } from './reports.js';
+import { specName } from './resolveSpecPath.js';
 
 export type EnrichAccsStatus = 'written' | 'nothing-to-fix' | 'refused';
 
@@ -13,6 +15,7 @@ export interface EnrichAccsResult {
   files: string[];
   effectiveTokens: number;
   detail?: string;
+  report?: string;
 }
 
 export interface EnrichAccsContext {
@@ -84,7 +87,23 @@ export async function enrichAccs(
     fixedFrom: verification.verdict,
   });
 
-  return { status: 'written', files, effectiveTokens };
+  const report = await writeReport(
+    output,
+    'accs-fix',
+    new Date().toISOString(),
+    accsFixReport(
+      {
+        spec: specName(path),
+        at: new Date(startedAt).toISOString(),
+        durationMs: Date.now() - startedAt,
+        effectiveTokens,
+      },
+      verification.summary,
+      correction.flow,
+    ),
+  );
+
+  return { status: 'written', files, effectiveTokens, report };
 }
 
 function refused(detail: string): EnrichAccsResult {
