@@ -47,7 +47,10 @@ export class TerminalRenderer {
   /** Appends issue lines above the blank line + status row, never touching earlier lines. */
   printIssueLines(lines: string[]): void {
     if (lines.length === 0) return;
-    this.write(CURSOR_UP_ONE + '\r' + CLEAR_DOWN);
+    // The leading \n terminates whatever status fragment was mid-write (no trailing newline of
+    // its own) so it never shares a raw output line with the issue text below; CURSOR_UP_ONE
+    // cancels that newline's visual line advance, so a live terminal sees no difference.
+    this.write('\n' + CURSOR_UP_ONE + '\r' + CLEAR_DOWN);
     for (const line of lines) this.write(`${line}\n`);
     this.write('\n');
     this.renderStatus();
