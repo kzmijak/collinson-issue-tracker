@@ -33,7 +33,7 @@ function serializeValue(schema: z.ZodTypeAny, depth: number): string {
   }
   if (schema instanceof z.ZodEnum) {
     const options = (schema as z.ZodEnum<[string, ...string[]]>).options.join(' | ');
-    return `"<${options}>"`;
+    return schema.description ? `"<${options}>"${COMMENT}${schema.description}` : `"<${options}>"`;
   }
   if (schema instanceof z.ZodArray) {
     const note = schema.description ? `${COMMENT}${schema.description}` : '';

@@ -22,6 +22,10 @@ describe('describe', () => {
     expect(result).not.toContain('second line');
   });
 
+  it('prints no line for a usage update, which only feeds the status line', () => {
+    expect(line({ kind: 'usage', effectiveTokens: 10, estimated: true, final: false })).toBeNull();
+  });
+
   it('drops narration that is only whitespace', () => {
     expect(line({ kind: 'text', text: '  \n\n ' })).toBeNull();
   });

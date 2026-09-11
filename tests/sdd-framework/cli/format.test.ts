@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inline, wrap } from '../../../src/sdd-framework/cli/format.js';
+import { fitLine, inline, wrap } from '../../../src/sdd-framework/cli/format.js';
 
 describe('inline', () => {
   it('renders bold rather than leaving asterisks in front of the operator', () => {
@@ -29,5 +29,27 @@ describe('wrap', () => {
     for (const line of wrap('supercalifragilistic '.repeat(10).trim(), 6)) {
       expect(line).not.toMatch(/supercalifragilisti$/);
     }
+  });
+});
+
+describe('fitLine', () => {
+  const tail = '...  4s · ~27,445 ET';
+
+  it('leaves a line that fits alone', () => {
+    expect(fitLine('verifying 001', tail, 80)).toBe(`verifying 001${tail}`);
+  });
+
+  it('shortens the label in the middle so the counters and the spec name survive', () => {
+    const line = fitLine(
+      'turn 1/3 · enriching specs/001-prototype-issues-reader/spec.md',
+      tail,
+      61,
+    );
+
+    expect(line).toHaveLength(60);
+    expect(line.endsWith(tail)).toBe(true);
+    expect(line.startsWith('turn 1/3')).toBe(true);
+    expect(line).toContain('…');
+    expect(line).toContain('spec.md');
   });
 });

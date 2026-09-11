@@ -52,4 +52,12 @@ describe('schemaToSpec', () => {
     expect(spec).toContain('"blocked": "", // null when done');
     expect(spec).not.toContain('\u0001');
   });
+
+  it('keeps the description of an enum, so the model knows what each option means', () => {
+    const spec = schemaToSpec(
+      z.object({ fix: z.enum(['spec', 'accs']).describe('what to redo'), last: z.string() }),
+    );
+
+    expect(spec).toContain('"fix": "<spec | accs>", // what to redo');
+  });
 });

@@ -9,7 +9,9 @@ import type { Prompt } from './Prompt.js';
 export type Activity =
   | { kind: 'text'; text: string }
   | { kind: 'tool'; name: string; target: string }
-  | { kind: 'stage'; label: string };
+  | { kind: 'stage'; label: string }
+  /** `final` marks the exact total of one finished call; everything before it is a running figure. */
+  | { kind: 'usage'; effectiveTokens: number; estimated: boolean; final: boolean };
 
 export interface PromptOptions {
   fresh?: boolean;

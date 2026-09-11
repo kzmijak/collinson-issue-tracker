@@ -1,6 +1,7 @@
 import { type EffortLevel, Options, query } from '@anthropic-ai/claude-agent-sdk';
 import { Prompt } from './Prompt.js';
 import type { Activity, Llm, PromptOptions, SystemPromptData, TokenUsage } from './Llm.js';
+import { effectiveTokens, LiveUsage } from './LiveUsage.js';
 
 export class QueryFailedError extends Error {
   constructor(
@@ -51,6 +52,7 @@ export class ClaudeCodeLlm implements Llm {
   private readonly model: string;
   private readonly tools: string[] | 'all';
   private systemPrompt = new SystemPrompt();
+  private observer: ((activity: Activity) => void) | undefined;
   private _totalUsage: TokenUsage = {
     inputTokens: 0,
     outputTokens: 0,
@@ -87,15 +89,22 @@ export class ClaudeCodeLlm implements Llm {
   lastUsage: Record<string, unknown> | null = null;
 
   get lastEffectiveTokens(): number {
-    const u = this.lastUsage as Record<string, number> | null;
+    const u = this.lastUsage as Record<string, number | undefined> | null;
     if (!u) return 0;
-    return (
-      (u.cache_read_input_tokens * 0.1 +
-        u.cache_creation_input_tokens * 1.25 +
-        u.input_tokens * 1 +
-        u.output_tokens * 5) *
-      this.costMultiplier
+    return effectiveTokens(
+      {
+        inputTokens: u.input_tokens ?? 0,
+        outputTokens: u.output_tokens ?? 0,
+        cacheReadTokens: u.cache_read_input_tokens ?? 0,
+        cacheCreationTokens: u.cache_creation_input_tokens ?? 0,
+      },
+      this.costMultiplier,
     );
+  }
+
+  /** Receives what every later call is doing, for a caller that did not pass its own listener. */
+  observe(listener: ((activity: Activity) => void) | undefined): void {
+    this.observer = listener;
   }
 
   get totalUsage(): TokenUsage {
@@ -113,6 +122,8 @@ export class ClaudeCodeLlm implements Llm {
       cacheReadTokens: 0,
       cacheCreationTokens: 0,
     };
+    // A call that fails before the SDK reports usage must not inherit the previous call's figure.
+    this.lastUsage = null;
     if (options.fresh) this.sessionId = null;
     const outputSpecification = (prompt.constructor as typeof Prompt).outputSpecification;
     this.updateSystemPrompt({ instructions: outputSpecification });
@@ -142,6 +153,8 @@ export class ClaudeCodeLlm implements Llm {
     { thinking, onActivity, taskBudgetTokens }: PromptOptions,
   ): Promise<string> {
     const budget = taskBudgetTokens ?? this.taskBudgetTokens;
+    const listener = onActivity ?? this.observer;
+    const live = new LiveUsage(this.costMultiplier);
 
     const options: Options = {
       model: this.model,
@@ -160,13 +173,19 @@ export class ClaudeCodeLlm implements Llm {
         : this.systemPrompt.toString(),
       ...(this.sessionId && { resume: this.sessionId }),
       ...(thinking && { thinking }),
+      ...(listener && { includePartialMessages: true }),
     };
 
     const q = query({ prompt: message, options });
 
     for await (const event of q) {
-      if (event.type === 'assistant' && onActivity) {
-        for (const activity of readActivities(event)) onActivity(activity);
+      if (event.type === 'stream_event') {
+        const reading = listener ? live.read(event.event) : null;
+        if (reading) listener?.({ kind: 'usage', ...reading, final: false });
+        continue;
+      }
+      if (event.type === 'assistant' && listener) {
+        for (const activity of readActivities(event)) listener(activity);
         continue;
       }
       if (event.type !== 'result') continue;
@@ -174,6 +193,12 @@ export class ClaudeCodeLlm implements Llm {
       // Usage is recorded before the outcome is judged: a call that failed still spent tokens, and
       // a meter that only counts successes understates every number this project reports.
       this.record(event.usage);
+      listener?.({
+        kind: 'usage',
+        effectiveTokens: this.lastEffectiveTokens,
+        estimated: false,
+        final: true,
+      });
       if (event.session_id) this.sessionId = event.session_id;
 
       if (event.subtype !== 'success') throw new QueryFailedError(event.subtype, event.errors);

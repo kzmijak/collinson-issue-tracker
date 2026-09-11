@@ -1,6 +1,7 @@
 import type { Activity } from '../llm/Llm.js';
 import { consoleLogger } from './consoleLogger.js';
-import { style } from './format.js';
+import { CLEAR_LINE, duration, fitLine, style } from './format.js';
+import { UsageTally } from './progress.js';
 
 export interface Live {
   activity: (activity: Activity) => void;
@@ -18,6 +19,8 @@ export function describe(activity: Activity): string | null {
     return `  ${style(activity.name, 'yellow')}${target}`;
   }
 
+  if (activity.kind === 'usage') return null;
+
   const first = activity.text.split('\n').find((line) => line.trim());
   return first ? `  ${style(clip(first.trim(), NARRATION_LIMIT), 'dim')}` : null;
 }
@@ -34,19 +37,20 @@ function clip(text: string, limit: number): string {
 export function startLive(label: string): Live {
   const startedAt = Date.now();
   const tty = process.stderr.isTTY;
+  const tally = new UsageTally();
   let stage = '';
-  let width = 0;
+  let drawn = false;
 
   const draw = (): void => {
     if (!tty) return;
-    const seconds = Math.round((Date.now() - startedAt) / 1000);
-    const line = `${label}${stage ? ` · ${stage}` : ''} · ${seconds}s`;
-    width = line.length;
-    process.stderr.write(`\r${line}`);
+    const head = `${label}${stage ? ` · ${stage}` : ''}`;
+    const tail = ` · ${duration(Date.now() - startedAt)} · ${tally.describe()}`;
+    process.stderr.write(`${CLEAR_LINE}${fitLine(head, tail, process.stderr.columns ?? 80)}`);
+    drawn = true;
   };
 
   const erase = (): void => {
-    if (tty && width > 0) process.stderr.write(`\r${' '.repeat(width)}\r`);
+    if (drawn) process.stderr.write(CLEAR_LINE);
   };
 
   const timer = tty ? setInterval(draw, 1_000) : null;
@@ -54,6 +58,7 @@ export function startLive(label: string): Live {
 
   return {
     activity: (activity) => {
+      tally.add(activity);
       if (activity.kind === 'stage') stage = activity.label;
 
       const line = describe(activity);
@@ -66,6 +71,9 @@ export function startLive(label: string): Live {
     stop: () => {
       if (timer) clearInterval(timer);
       erase();
+      consoleLogger.info(
+        `${style('•', 'dim')} ${label} — ${duration(Date.now() - startedAt)} · ${tally.describe()}`,
+      );
     },
   };
 }

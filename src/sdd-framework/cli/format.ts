@@ -52,3 +52,31 @@ export function wrap(text: string, indent: number): string[] {
 
   return lines;
 }
+
+export function duration(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
+}
+
+export function effectiveTokens(value: number, estimated = false): string {
+  return `${estimated ? '~' : ''}${Math.round(value).toLocaleString('en-US')} ET`;
+}
+
+/** Carriage return, then erase the whole row — safe however long the previous frame was. */
+export const CLEAR_LINE = `\r${ESC}2K`;
+
+/**
+ * A status line that wraps can no longer be redrawn in place: a carriage return only reaches the
+ * start of its last row, so every tick leaves the earlier rows behind. The label gives way in the
+ * middle; the counters at the end always stay visible.
+ */
+export function fitLine(label: string, tail: string, columns: number): string {
+  const room = columns - 1 - tail.length;
+  if (label.length <= room) return `${label}${tail}`;
+  if (room < 8) return `${label}${tail}`.slice(0, Math.max(columns - 1, 1));
+
+  const head = Math.ceil((room - 1) / 2);
+  const end = room - 1 - head;
+  return `${label.slice(0, head)}…${label.slice(label.length - end)}${tail}`;
+}
