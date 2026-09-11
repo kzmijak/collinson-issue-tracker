@@ -1,5 +1,0 @@
-{
-  "id": "evidence-anchored",
-  "trigger": "always",
-  "content": "Arguments must be anchored in evidence, not imagination. 'I think it would look better' or 'I feel like this is wrong' are not arguments. Cite specifics: prior decisions, measurements, user behavior, technical constraints, or documented patterns."
-}

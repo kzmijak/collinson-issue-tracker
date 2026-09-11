@@ -1,5 +1,0 @@
-{
-  "id": "domain-veto",
-  "trigger": "always",
-  "content": "Each participant has a declared domain of expertise. You may veto proposals only within your domain. When vetoing, cite the specific principle violated. A veto can be overridden by unanimous agreement of all other participants."
-}
