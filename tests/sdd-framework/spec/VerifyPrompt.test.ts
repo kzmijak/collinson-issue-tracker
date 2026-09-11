@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ModelContractError } from '../../../src/sdd-framework/spec/EnrichPrompt.js';
 import { VerifyPrompt } from '../../../src/sdd-framework/spec/VerifyPrompt.js';
 
-const prompt = new VerifyPrompt(
-  '# 001 — Thing\n\nprose',
-  '### accs.bash\n\nexit 1',
-  'instructions',
-);
+const prompt = new VerifyPrompt('# 001 — Thing\n\nprose', '### accs.bash\n\nexit 1');
 
 describe('VerifyPrompt', () => {
   it('accepts the fully-shaped answer', () => {
@@ -86,5 +82,9 @@ describe('VerifyPrompt', () => {
     const shapes = VerifyPrompt.outputSpecification.match(/"area":/g) ?? [];
 
     expect(shapes).toHaveLength(3);
+  });
+
+  it('says what to do, since the identity carries the rules but not the task', () => {
+    expect(prompt.createMessage()).toContain('## Your task');
   });
 });

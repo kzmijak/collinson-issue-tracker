@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const findingSchema = z.object({
+export const findingSchema = z.object({
   area: z.string().min(1).describe('one or two words: Falsifiability, Scope, Method, Coverage'),
   quote: z
     .string()
@@ -29,9 +29,7 @@ const softFindingSchema = z.union([
 export const verdictSchema = z.object({
   verdict: z.enum(['approved', 'rejected']),
   summary: z.string().min(1).describe('at most two sentences: what is wrong, in plain words'),
-  mustFix: z
-    .array(findingSchema)
-    .describe('the spec cannot be implemented, or its ACCS cannot fail; any entry means rejected'),
+  mustFix: z.array(findingSchema).describe('any entry means rejected'),
   shouldFix: z.array(softFindingSchema).describe('a real weakness that does not stop work'),
   shouldKnow: z
     .array(softFindingSchema)

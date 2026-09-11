@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { ClaudeCodeLlm } from '../llm/ClaudeCodeLlm.js';
 import { PROJECT_CONTEXT, readAgentPrompt } from '../spec/agentPrompt.js';
+import { REVIEWER_DEFINITION } from '../spec/verify.js';
 
 export const ENRICHER_DEFINITION = '.ai/identities/enricher.md';
 export const ACCS_AUTHOR_DEFINITION = '.ai/identities/accs-author.md';
@@ -17,11 +18,7 @@ export const SPEC_MODEL = 'claude-sonnet-5';
  */
 export const ENRICH_TASK_BUDGET_TOKENS = 45_000;
 
-const VERIFY_TASK_BUDGET_TOKENS = 30_000;
-
-const VERIFIER_IDENTITY =
-  'You review specifications for collinson-issue-tracker. You judge whether a spec can be ' +
-  'implemented unambiguously and whether its check can fail.';
+const VERIFY_TASK_BUDGET_TOKENS = 60_000;
 
 export function createEnricher(): ClaudeCodeLlm {
   const llm = new ClaudeCodeLlm(SPEC_MODEL, readAgentPrompt(ENRICHER_DEFINITION), {
@@ -46,7 +43,8 @@ export function createAccsAuthor(): ClaudeCodeLlm {
 }
 
 export function createVerifier(): ClaudeCodeLlm {
-  const llm = new ClaudeCodeLlm(SPEC_MODEL, VERIFIER_IDENTITY, {
+  const identity = readAgentPrompt(REVIEWER_DEFINITION, { without: ['Output format'] });
+  const llm = new ClaudeCodeLlm(SPEC_MODEL, identity, {
     taskBudgetTokens: VERIFY_TASK_BUDGET_TOKENS,
   });
   llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });

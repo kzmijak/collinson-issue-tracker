@@ -20,7 +20,11 @@ const prompt = new ApplyPrompt({
 
 describe('ApplyPrompt', () => {
   it('accepts the agreed shape', () => {
-    expect(prompt.parseOutput(JSON.stringify(answer))).toEqual({ ...answer, specIssues: [] });
+    expect(prompt.parseOutput(JSON.stringify(answer))).toEqual({
+      ...answer,
+      findings: [],
+      fix: 'none',
+    });
   });
 
   it('refuses an answer missing the record of what changed', () => {

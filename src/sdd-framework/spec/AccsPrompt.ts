@@ -78,7 +78,7 @@ export class AccsCorrectionPrompt extends AccsFilesPrompt {
     return [
       '## You are fixing the ACCS only',
       '',
-      `The reviewer returned "${this.verification.verdict}": ${this.verification.summary}`,
+      `${this.verification.by === 'implementer' ? 'The implementer' : 'The reviewer'} returned "${this.verification.verdict}": ${this.verification.summary}`,
       '',
       ...findingLines('Must fix', this.verification.mustFix),
       ...findingLines('Should fix', this.verification.shouldFix),

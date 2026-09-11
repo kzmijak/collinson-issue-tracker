@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { findingSchema } from './Verdict.js';
 
 const pickSchema = z.object({
   decision: z.string().min(1).describe('the open question, under twelve words'),
@@ -19,15 +20,23 @@ export const implementationSchema = z.object({
   picks: z
     .array(pickSchema)
     .describe('one entry per choice the spec left open; empty only if it decided everything'),
-  specIssues: z
-    .array(z.string().min(1).describe('a bug or loophole found in the spec or the ACCS, and where'))
+  findings: z
+    .array(findingSchema)
     .default([])
-    .describe('left for the operator to decide on; empty when there were none'),
+    .describe('every bug or loophole found in the spec or the ACCS; empty when there were none'),
+  fix: z
+    .enum(['none', 'full', 'accs'])
+    .describe(
+      "'none': the spec stands; 'full': the enriched spec is flawed, so it is rewritten and the ACCS rebuilt with it; 'accs': fixing the ACCS suite alone is enough",
+    )
+    .default('none'),
   blocked: z
     .string()
     .describe('at most three sentences naming what conflicts with what')
     .nullable()
-    .describe('null when you are done'),
+    .describe(
+      'null when you are done or ran out of time or budget — only a spec or ACCS that cannot be satisfied blocks',
+    ),
   remedy: z
     .string()
     .describe('the single thing the operator has to do, one line; the bare command if it is one')

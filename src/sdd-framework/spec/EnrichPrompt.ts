@@ -10,6 +10,8 @@ export interface Feedback {
   /** Whether the operator has changed spec.md or accs.md since this verdict was given. */
   operatorSectionChanged: boolean;
   verdict: 'approved' | 'rejected';
+  /** Who sent it back; missing means the verifier. */
+  by?: 'verifier' | 'implementer';
   summary: string;
   mustFix: { area: string; quote: string | null; problem: string }[];
   shouldFix: { area: string; quote: string | null; problem: string }[];
@@ -104,7 +106,7 @@ function correctionBrief(feedback: Feedback): string[] {
   return [
     '## You are correcting your own previous answer',
     '',
-    `A reviewer returned ${feedback.verdict}: ${feedback.summary}`,
+    `${feedback.by === 'implementer' ? 'The implementer' : 'A reviewer'} returned ${feedback.verdict}: ${feedback.summary}`,
     '',
     feedback.operatorSectionChanged
       ? 'The operator has changed spec.md or accs.md since that verdict.'

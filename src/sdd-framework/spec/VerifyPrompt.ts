@@ -7,7 +7,6 @@ export class VerifyPrompt extends JsonPrompt<Verdict> {
   constructor(
     private readonly spec: string,
     private readonly artefacts: string,
-    private readonly instructions: string,
   ) {
     super();
   }
@@ -16,8 +15,6 @@ export class VerifyPrompt extends JsonPrompt<Verdict> {
 
   createMessage(): string {
     return [
-      this.instructions,
-      '',
       '## The specification',
       '',
       this.spec,
@@ -25,6 +22,10 @@ export class VerifyPrompt extends JsonPrompt<Verdict> {
       this.artefacts
         ? `## The files this spec generated\n\n${this.artefacts}`
         : '## The files this spec generated\n\n(none yet — the ACCS cannot be inspected)',
+      '',
+      '## Your task',
+      '',
+      'Verify this enrichment and answer with the verdict.',
     ].join('\n');
   }
 

@@ -1,11 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import type { Llm } from '../llm/Llm.js';
-import { readAgentPrompt } from './agentPrompt.js';
 import { amendMetrics, latestMetricsPath, type EnrichMetrics } from './metrics.js';
 import { readArtefacts } from './readArtefacts.js';
 import { VerifyPrompt } from './VerifyPrompt.js';
 import type { Verdict } from './schemas/Verdict.js';
 import { setStatus, specSha } from './SpecFile.js';
+import { readPreviousFiles } from './specFiles.js';
 import { describeSpec, isStale, readSpecFolder } from './specFolder.js';
 import { latestReport, verifyReport, writeReport } from './reports.js';
 import { specName } from './resolveSpecPath.js';
@@ -37,7 +37,7 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
         : 'this spec has never been enriched — run `pnpm enrich` first.',
     );
   }
-  const artefacts = await readArtefacts(output);
+  const artefacts = await readArtefacts(output, readPreviousFiles(folder.enriched));
   const sha = specSha(folder.operatorSection, folder.accs, folder.enriched, artefacts);
 
   const stored = force ? null : await storedVerdict(output, sha);
@@ -53,15 +53,10 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
     };
   }
 
-  const instructions = readAgentPrompt(REVIEWER_DEFINITION, { without: ['Output format'] });
-
   try {
-    const verdict = await llm.prompt(
-      new VerifyPrompt(describeSpec(folder), artefacts, instructions),
-      {
-        fresh: true,
-      },
-    );
+    const verdict = await llm.prompt(new VerifyPrompt(describeSpec(folder), artefacts), {
+      fresh: true,
+    });
     const effectiveTokens = llm.lastEffectiveTokens;
 
     await writeFile(folder.paths.enriched, setStatus(folder.enriched, verdict.verdict), 'utf8');
