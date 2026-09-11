@@ -39,5 +39,12 @@
     "fix": "accs",
     "effectiveTokens": 82992.6,
     "specSha": "1dbfb3e4bea1"
-  }
+  },
+  "commits": [
+    {
+      "at": "2026-09-11T18:33:55.982Z",
+      "sha": "b0002ba",
+      "subject": "spec(reader): add 002-early-alpha-issues-reader specification"
+    }
+  ]
 }
