@@ -82,6 +82,11 @@
       "at": "2026-09-11T17:45:13.316Z",
       "sha": "612987c",
       "subject": "feat(reader): rewrite accs.bash for the combined-repo, head-bounded contract"
+    },
+    {
+      "at": "2026-09-11T17:45:13.504Z",
+      "sha": "0f4f72f",
+      "subject": "chore(reader): commit the 001-prototype-issues-reader apply/verify/enrich run artefacts"
     }
   ]
 }
