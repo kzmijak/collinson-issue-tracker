@@ -10,3 +10,7 @@ specs/*/spec.md
 node_modules
 dist
 pnpm-lock.yaml
+
+# Hand-written prompts, distributed verbatim. Reformatting would alter text no AI may edit.
+CONCEPT.md
+.ai/

@@ -12,13 +12,13 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "tsx src/cli/test.ts",
-    "prototype-issues-reader": "tsx --env-file-if-exists=.env src/reader/main.ts",
+    "test": "tsx src/sdd-framework/cli/test.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
-    "enrich": "tsx --env-file-if-exists=.env src/cli/enrich.ts",
-    "apply": "tsx --env-file-if-exists=.env src/cli/apply.ts",
-    "commit": "tsx --env-file-if-exists=.env src/cli/commit.ts",
-    "verify": "tsx --env-file-if-exists=.env src/cli/verify.ts"
+    "enrich": "tsx --env-file-if-exists=.env src/sdd-framework/cli/enrich.ts",
+    "enrich:accs": "tsx --env-file-if-exists=.env src/sdd-framework/cli/enrich.ts --accs",
+    "apply": "tsx --env-file-if-exists=.env src/sdd-framework/cli/apply.ts",
+    "commit": "tsx --env-file-if-exists=.env src/sdd-framework/cli/commit.ts",
+    "verify": "tsx --env-file-if-exists=.env src/sdd-framework/cli/verify.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.96",
