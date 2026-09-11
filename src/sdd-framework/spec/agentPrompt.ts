@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 
+export const PROJECT_CONTEXT = '.ai/context.md';
+
 export interface AgentPromptProps {
   /** Headings to drop, with everything under them until the next heading of the same level. */
   without?: string[];

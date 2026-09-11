@@ -1,5 +1,6 @@
 import { apply, type ApplyResult } from '../spec/apply.js';
 import { ClaudeCodeLlm } from '../llm/ClaudeCodeLlm.js';
+import { PROJECT_CONTEXT, readAgentPrompt } from '../spec/agentPrompt.js';
 import { ModelContractError } from '../spec/EnrichPrompt.js';
 import { resolveSpecPath, SpecNotFoundError } from '../spec/resolveSpecPath.js';
 import { SpecFormatError } from '../spec/SpecFile.js';
@@ -15,7 +16,7 @@ import { startLive } from './live.js';
  * first unbudgeted opus run cost 5,370,381 effective tokens to reach a blocked verdict.
  *
  * The ceiling is the operator's, in effective tokens, and the rounds share it — three rounds of a
- * full allowance would be three times the number they set. `src/spec/budget.ts` converts what is
+ * full allowance would be three times the number they set. `spec/budget.ts` converts what is
  * left into the plain-token advisory the model is actually given, so it paces itself and delivers a
  * complete smaller answer instead of being cut off mid-edit.
  *
@@ -23,10 +24,11 @@ import { startLive } from './live.js';
  * ceiling has nothing to stop it.
  *
  * The model and the ceiling are the operator's. The other three numbers are picks, recorded in
- * `notes/apply-defaults.md`; `--rounds` and `--budget` override the two most likely to be wrong.
+ * `docs/apply-defaults.md`; `--rounds` and `--budget` override the two most likely to be wrong.
  */
 const MODEL = 'claude-sonnet-5';
-const EFFECTIVE_TOKEN_BUDGET = 800_000;
+const EFFECTIVE_TOKEN_BUDGET = 900_000;
+const TIME_LIMIT_MS = 30 * 60_000;
 const MAX_TURNS = 200;
 const ROUNDS = 3;
 const CHECK_TIMEOUT_MS = 300_000;
@@ -76,6 +78,7 @@ async function main(): Promise<number> {
     maxTurns: MAX_TURNS,
     presetSystemPrompt: true,
   });
+  llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });
   consoleLogger.info(
     style(
       `${MODEL} · ceiling ${budget.toLocaleString('en-US')} effective tokens · up to ${rounds} rounds`,
@@ -89,6 +92,7 @@ async function main(): Promise<number> {
     effectiveTokenBudget: budget,
     rounds,
     checkTimeoutMs: CHECK_TIMEOUT_MS,
+    timeLimitMs: TIME_LIMIT_MS,
     force,
     onActivity: live.activity,
   }).finally(live.stop);
@@ -137,6 +141,19 @@ function report(result: ApplyResult, spec: string, budget: number): number {
     section(
       'Why it stopped',
       [{ body: 'The ceiling ran out before the check went green. Raise it with `--budget`.' }],
+      'x',
+      'red',
+    );
+  }
+
+  if (result.status === 'time-exhausted') {
+    section(
+      'Why it stopped',
+      [
+        {
+          body: 'The 30-minute limit passed before the check went green. No new round was started.',
+        },
+      ],
       'x',
       'red',
     );

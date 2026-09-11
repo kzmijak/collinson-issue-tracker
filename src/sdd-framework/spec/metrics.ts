@@ -1,7 +1,7 @@
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Finding } from './VerifyPrompt.js';
-import type { ImplementationPick } from './ApplyPrompt.js';
+import type { Finding } from './schemas/Verdict.js';
+import type { ImplementationPick } from './schemas/Implementation.js';
 import { slug } from '../llm/slug.js';
 import type { TokenUsage } from '../llm/Llm.js';
 
@@ -15,11 +15,12 @@ export type Outcome =
   | 'refused'
   | 'query-failed'
   | 'verified'
-  | 'verification-failed';
+  | 'verification-failed'
+  | 'nothing-to-fix';
 
 export interface Verification {
   at: string;
-  verdict: 'accepted' | 'rejected';
+  verdict: 'approved' | 'rejected';
   summary: string;
   mustFix: Finding[];
   shouldFix: Finding[];
@@ -52,6 +53,14 @@ export interface Application {
   specSha: string;
 }
 
+/** A verify call that threw before producing a verdict — the spend is real, the judgment is not. */
+export interface VerificationFailure {
+  at: string;
+  effectiveTokens: number;
+  specSha: string;
+  detail: string;
+}
+
 export interface CommitNote {
   at: string;
   sha: string;
@@ -76,6 +85,8 @@ export interface EnrichMetrics {
   fixedFrom?: string;
   /** Appended by `pnpm verify`, so one file carries the whole life of one enrichment. */
   verification?: Verification;
+  /** Appended by `pnpm verify` when the call threw — the previous `verification`, if any, stands. */
+  verificationFailure?: VerificationFailure;
   /** Appended by `pnpm apply`, so the implementation sits beside the spec that asked for it. */
   application?: Application;
   /** Appended by `pnpm commit`, linking the enrichment to what carried it into history. */

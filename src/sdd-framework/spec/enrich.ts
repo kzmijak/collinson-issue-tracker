@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Llm } from '../llm/Llm.js';
-import type { EnrichedBody } from './EnrichedSpec.js';
+import type { EnrichedBody } from './schemas/Enrichment.js';
 import { latestMetricsPath, writeMetrics, type EnrichMetrics, type Outcome } from './metrics.js';
 import { EnrichPrompt, type EnrichMode, type Feedback } from './EnrichPrompt.js';
 import { renderSpec } from './renderSpec.js';
@@ -13,7 +13,7 @@ import {
   replaceGenerated,
   splitSpec,
 } from './SpecFile.js';
-import { pruneOrphans, readPreviousFiles, TEST_SCRIPT, writeGeneratedFiles } from './specFiles.js';
+import { pruneOrphans, readPreviousFiles, ACCS_SCRIPT, writeGeneratedFiles } from './specFiles.js';
 
 export type EnrichResult =
   | {
@@ -90,7 +90,7 @@ export async function enrich(
     }
 
     const enrichment = await llm.prompt(
-      new EnrichPrompt(head, mode, join(specDir, TEST_SCRIPT), feedback),
+      new EnrichPrompt(head, mode, join(specDir, ACCS_SCRIPT), feedback),
       { fresh: true },
     );
     const effectiveTokens = llm.lastEffectiveTokens;
@@ -113,7 +113,7 @@ export async function enrich(
       entries: readEntries(head),
       sourceSha,
       files,
-      status: 'unverified',
+      status: 'draft',
     });
     await writeFile(path, replaceGenerated(source, body), 'utf8');
     await record('written', { files, pruned, counts: countsOf(enrichment.body) });

@@ -4,15 +4,16 @@ import { dirname, join } from 'node:path';
 import type { Activity, Llm, TokenUsage } from '../llm/Llm.js';
 import { budgetTokens, MIN_ROUND_EFFECTIVE_TOKENS } from './budget.js';
 import { readAgentPrompt } from './agentPrompt.js';
-import { ApplyPrompt, ReapplyPrompt, type Implementation } from './ApplyPrompt.js';
+import { ApplyPrompt, ReapplyPrompt } from './ApplyPrompt.js';
+import type { Implementation } from './schemas/Implementation.js';
 import { readKnowledgeBase } from './knowledgeBase.js';
 import { amendMetrics } from './metrics.js';
 import { readArtefacts } from './readArtefacts.js';
 import { COULD_NOT_RUN, runCheck, type CheckResult } from './runCheck.js';
-import { readStatus, specSha, splitSpec } from './SpecFile.js';
-import { TEST_SCRIPT } from './specFiles.js';
+import { isEnrichmentStale, readStatus, specSha, splitSpec } from './SpecFile.js';
+import { ACCS_SCRIPT } from './specFiles.js';
 
-export const IMPLEMENTER_DEFINITION = '.claude/agents/spec-implementer.md';
+export const IMPLEMENTER_DEFINITION = '.ai/identities/implementer.md';
 
 export type ApplyStatus =
   | 'converged'
@@ -21,7 +22,8 @@ export type ApplyStatus =
   | 'blocked'
   | 'refused'
   | 'check-unrunnable'
-  | 'budget-exhausted';
+  | 'budget-exhausted'
+  | 'time-exhausted';
 
 export interface ApplyProps {
   model: string;
@@ -29,6 +31,8 @@ export interface ApplyProps {
   effectiveTokenBudget: number;
   rounds: number;
   checkTimeoutMs: number;
+  /** No new round starts after this; a round already running is never cut off, so its spend is still counted. */
+  timeLimitMs: number;
   force: boolean;
   /** Reports as the run goes, so minutes of silence are not the only feedback available. */
   onActivity?: (activity: Activity) => void;
@@ -51,19 +55,27 @@ export interface ApplyResult {
  * one that establishes it should not happen.
  */
 export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<ApplyResult> {
+  const startedAt = Date.now();
   const specDir = dirname(path);
   const source = await readFile(path, 'utf8');
-  const { generated } = splitSpec(source);
-  const verdict = readStatus(generated);
+  const split = splitSpec(source);
+  const verdict = readStatus(split.generated);
 
-  if (verdict !== 'accepted' && !props.force) {
+  if (isEnrichmentStale(split) && !props.force) {
     return refused(
-      `the spec's status is "${verdict}", not "accepted" — implementing one the verifier has not ` +
+      'the operator section changed since the spec was enriched and approved — run `pnpm enrich` ' +
+        'and `pnpm verify` first, or `--force`.',
+    );
+  }
+
+  if (verdict !== 'approved' && !props.force) {
+    return refused(
+      `the spec's status is "${verdict}", not "approved" — implementing one the verifier has not ` +
         'passed is how a rejected decision reaches the code. Run `pnpm verify` first, or `--force`.',
     );
   }
 
-  const script = join(specDir, TEST_SCRIPT);
+  const script = join(specDir, ACCS_SCRIPT);
   if (!existsSync(script)) {
     return refused(`${script} does not exist — there is no acceptance check to converge on.`);
   }
@@ -97,6 +109,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
   let effectiveTokens = 0;
   let round = 0;
   let exhausted = false;
+  let outOfTime = false;
 
   while (round < props.rounds) {
     const remaining = props.effectiveTokenBudget - effectiveTokens;
@@ -105,6 +118,10 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     // full budget is three times the ceiling the operator set.
     if (remaining < MIN_ROUND_EFFECTIVE_TOKENS && round > 0) {
       exhausted = true;
+      break;
+    }
+    if (round > 0 && Date.now() - startedAt >= props.timeLimitMs) {
+      outOfTime = true;
       break;
     }
     round += 1;
@@ -138,7 +155,11 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     if (check.exitCode === 0 || check.exitCode === COULD_NOT_RUN) break;
   }
 
-  const status = exhausted ? 'budget-exhausted' : settle(implementation, check);
+  const status = exhausted
+    ? 'budget-exhausted'
+    : outOfTime
+      ? 'time-exhausted'
+      : settle(implementation, check);
   const attachedTo = await amendMetrics(specDir, {
     application: {
       at: new Date().toISOString(),

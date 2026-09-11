@@ -1,6 +1,6 @@
-import type { EnrichedBody } from './EnrichedSpec.js';
+import type { EnrichedBody } from './schemas/Enrichment.js';
 
-export type VerificationStatus = 'unverified' | 'accepted' | 'rejected';
+export type VerificationStatus = 'draft' | 'approved' | 'rejected';
 
 export interface SpecMeta {
   generatedOn: string;

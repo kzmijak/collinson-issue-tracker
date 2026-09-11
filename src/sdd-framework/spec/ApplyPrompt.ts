@@ -1,26 +1,8 @@
-import { z } from 'zod';
 import { JsonPrompt } from '../llm/JsonPrompt.js';
+import { schemaToSpec } from '../llm/schemaToSpec.js';
+import { implementationSchema, type Implementation } from './schemas/Implementation.js';
 import { ModelContractError } from './EnrichPrompt.js';
 import { excerpt, type CheckResult } from './runCheck.js';
-
-const pickSchema = z.object({
-  decision: z.string().min(1),
-  chose: z.string().min(1),
-  why: z.string().min(1),
-});
-
-export type ImplementationPick = z.infer<typeof pickSchema>;
-
-export const implementationSchema = z.object({
-  summary: z.string().min(1),
-  files: z.array(z.string()),
-  picks: z.array(pickSchema),
-  blocked: z.string().nullable(),
-  /** The single thing the operator has to do. Null unless blocked. */
-  remedy: z.string().nullable(),
-});
-
-export type Implementation = z.infer<typeof implementationSchema>;
 
 export interface ApplyContext {
   /** The whole spec file, both halves, verbatim. */
@@ -33,35 +15,9 @@ export interface ApplyContext {
   script: string;
 }
 
-const OUTPUT_CONTRACT = [
-  '## How to answer',
-  '',
-  'This is read in a terminal, by someone doing three other things. A long answer buries the one',
-  'line that matters, so length is not thoroughness here — it is the opposite.',
-  '',
-  'Talk like a colleague at the next desk. Do not restate the specification back. Do not list what',
-  'you ruled out, do not narrate your own process, and do not explain a decision twice because it',
-  'appears in two fields. If you refused a workaround, one clause is enough.',
-  '',
-  'Return one JSON object and nothing else:',
-  '',
-  '{ "summary": "...", "files": ["..."], "picks": [{ "decision": "...", "chose": "...",',
-  '  "why": "..." }], "blocked": null, "remedy": null }',
-  '',
-  '- "summary" — **at most three sentences.** What you built, and whether it works. Not how you',
-  '  decided, not what you considered.',
-  '- "files" — every file you created or changed, repo-relative. Complete: it is the record of what',
-  '  moved, and a missing entry means a change nobody knows about.',
-  '- "picks" — one entry for every choice the specification left open. "decision" is the question',
-  '  in under twelve words. "chose" is what you did, one line. "why" is **one sentence.**',
-  '  An empty list claims the spec decided everything, so only send one if that is true.',
-  '- "blocked" — null when you are done. Otherwise **at most three sentences** naming what',
-  '  conflicts with what, with the evidence inside one of them.',
-  '- "remedy" — null unless blocked. Otherwise the single thing the operator has to do, as one',
-  '  line. If it is a command, write the command and nothing else.',
-].join('\n');
-
 abstract class ImplementationPrompt extends JsonPrompt<Implementation> {
+  static outputSpecification = schemaToSpec(implementationSchema);
+
   protected outputParser(output: object): Implementation {
     const parsed = implementationSchema.safeParse(output);
 
@@ -111,11 +67,6 @@ export class ApplyPrompt extends ImplementationPrompt {
       `    bash ${this.context.script}`,
       '',
       'Run it whenever you want. You are done when it exits 0.',
-      '',
-      'Everything that was decided about what to build is above. If something is not there, it was',
-      'not decided — handle it the way you were told to handle an undecided choice, and record it.',
-      '',
-      OUTPUT_CONTRACT,
     ].join('\n');
   }
 }
@@ -146,12 +97,7 @@ export class ReapplyPrompt extends ImplementationPrompt {
       '',
       `The check exited ${this.check.exitCode}.`,
       '',
-      'Fix your code and run it again. Never change the check and never change the specification to',
-      'match what you built. If the check cannot pass as written, set "blocked" and name the',
-      'conflict instead of working around it.',
-      '',
-      'Answer in the same JSON shape as before, under the same limits: three sentences of summary,',
-      'one sentence per reason.',
+      'Fix your code and run it again. Answer in the same JSON shape.',
     ].join('\n');
   }
 }

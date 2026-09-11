@@ -21,6 +21,11 @@ export function normaliseHead(head: string): string {
   return head.replace(/\s+/g, ' ').trim();
 }
 
+/** The operator appended an entry after the generated half was written, so that half answers older words. */
+export function isEnrichmentStale({ head, generated }: SplitSpec): boolean {
+  return !generated.includes(`source-sha: ${headSha(head)}`);
+}
+
 export interface SplitSpec {
   head: string;
   generated: string;
@@ -94,7 +99,7 @@ function assertDistinctLabels(head: string): void {
  * ran once against this input".
  */
 export function readStatus(generated: string): string {
-  return /^status:\s*(\S+)$/m.exec(generated)?.[1] ?? 'unverified';
+  return /^status:\s*(\S+)$/m.exec(generated)?.[1] ?? 'draft';
 }
 
 /** Flips the verdict line in place, leaving the rest of the generated section untouched. */

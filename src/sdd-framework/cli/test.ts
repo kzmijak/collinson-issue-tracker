@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { resolveSpecPath, SpecNotFoundError } from '../spec/resolveSpecPath.js';
-import { TEST_SCRIPT } from '../spec/specFiles.js';
+import { ACCS_SCRIPT } from '../spec/specFiles.js';
 import { consoleLogger } from './consoleLogger.js';
 
 const COULD_NOT_RUN = 2;
@@ -19,7 +19,7 @@ function main(): void {
     return;
   }
 
-  const script = join(dirname(resolveSpecPath(target)), TEST_SCRIPT);
+  const script = join(dirname(resolveSpecPath(target)), ACCS_SCRIPT);
 
   if (!existsSync(script)) {
     consoleLogger.error(`${script} does not exist — run \`pnpm enrich ${target}\` first.`);

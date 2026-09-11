@@ -1,8 +1,8 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import type { EnrichedBody } from './EnrichedSpec.js';
+import type { EnrichedBody } from './schemas/Enrichment.js';
 
-export const TEST_SCRIPT = 'test.bash';
+export const ACCS_SCRIPT = 'accs.bash';
 
 export class SpecFileEscapeError extends Error {}
 
@@ -12,7 +12,7 @@ export class SpecFileEscapeError extends Error {}
  * rather than sanitised.
  */
 /**
- * The prompt shows the model a repo-root path for the test script, so it answers with repo-root
+ * The prompt shows the model a repo-root path for the ACCS, so it answers with repo-root
  * paths. Accept either that or a spec-relative one rather than rejecting a good result over a
  * convention the prompt itself blurred.
  */
@@ -55,10 +55,10 @@ export function assertBlackBox(files: EnrichedBody['files']): void {
 }
 
 export function assertTestScriptPresent(specDir: string, files: EnrichedBody['files']): void {
-  if (files.some((file) => normaliseGeneratedPath(specDir, file.path) === TEST_SCRIPT)) return;
+  if (files.some((file) => normaliseGeneratedPath(specDir, file.path) === ACCS_SCRIPT)) return;
 
   throw new SpecFileEscapeError(
-    `the generated files do not include ${TEST_SCRIPT}, which the check row invokes. ` +
+    `the generated files do not include ${ACCS_SCRIPT}, which the check row invokes. ` +
       `Got: ${files.map((file) => file.path).join(', ') || '(none)'}`,
   );
 }
@@ -78,7 +78,7 @@ export async function writeGeneratedFiles(
     await mkdir(dirname(file.target), { recursive: true });
     await writeFile(file.target, ensureTrailingNewline(file.content), {
       encoding: 'utf8',
-      mode: file.executable || file.path === TEST_SCRIPT ? 0o755 : 0o644,
+      mode: file.executable || file.path === ACCS_SCRIPT ? 0o755 : 0o644,
     });
   }
   return targets.map((file) => join(specDir, file.path));

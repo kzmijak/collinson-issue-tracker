@@ -1,10 +1,11 @@
 import { ClaudeCodeLlm, QueryFailedError } from '../llm/ClaudeCodeLlm.js';
+import { PROJECT_CONTEXT, readAgentPrompt } from '../spec/agentPrompt.js';
 import { ModelContractError } from '../spec/EnrichPrompt.js';
 import { resolveSpecPath, SpecNotFoundError } from '../spec/resolveSpecPath.js';
-import { verify } from '../spec/verify.js';
+import { StaleEnrichmentError, verify } from '../spec/verify.js';
 import { SpecFormatError } from '../spec/SpecFile.js';
 import { consoleLogger } from './consoleLogger.js';
-import type { Finding } from '../spec/VerifyPrompt.js';
+import type { Finding } from '../spec/schemas/Verdict.js';
 
 const asItem = (finding: Finding) => ({
   title: finding.area,
@@ -37,6 +38,7 @@ async function main(): Promise<number> {
   const llm = new ClaudeCodeLlm('claude-sonnet-5', IDENTITY, {
     taskBudgetTokens: TASK_BUDGET_TOKENS,
   });
+  llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });
   const progress = startProgress(`verifying ${path}`);
   const result = await verify(path, llm, force).finally(progress.stop);
 
@@ -44,8 +46,8 @@ async function main(): Promise<number> {
     ? 'unchanged since the last verdict, reused'
     : `${Math.round(result.effectiveTokens).toLocaleString('en-US')} effective tokens`;
 
-  const accepted = result.verdict === 'accepted';
-  banner(accepted ? 'ACCEPTED' : 'REJECTED', accepted ? 'green' : 'red', path, cost);
+  const approved = result.verdict === 'approved';
+  banner(approved ? 'APPROVED' : 'REJECTED', approved ? 'green' : 'red', path, cost);
   paragraph(result.summary);
 
   section('Must fix', result.mustFix.map(asItem), 'x', 'red');
@@ -75,7 +77,8 @@ main()
       error instanceof ModelContractError ||
       error instanceof SpecNotFoundError ||
       error instanceof SpecFormatError ||
-      error instanceof QueryFailedError;
+      error instanceof QueryFailedError ||
+      error instanceof StaleEnrichmentError;
     consoleLogger.error(error instanceof Error ? error.message : String(error));
     process.exitCode = known ? 2 : 1;
   });

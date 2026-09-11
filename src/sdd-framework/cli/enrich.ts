@@ -1,4 +1,6 @@
+import { PROJECT_CONTEXT, readAgentPrompt } from '../spec/agentPrompt.js';
 import { enrich } from '../spec/enrich.js';
+import { ENRICHER_DEFINITION, enrichAccs } from '../spec/enrichAccs.js';
 import { ClaudeCodeLlm, QueryFailedError } from '../llm/ClaudeCodeLlm.js';
 import { ModelContractError, type EnrichMode } from '../spec/EnrichPrompt.js';
 import { resolveSpecPath, SpecNotFoundError } from '../spec/resolveSpecPath.js';
@@ -10,34 +12,40 @@ import { startProgress } from './progress.js';
 /**
  * What the model is told it has, so it paces itself and wraps up instead of being truncated at the
  * output ceiling. Output carries a ×10 weight for sonnet-5 in effective tokens, so 45,000 tokens
- * plus the cache overhead measured in `notes/enrich-cost-measurements.md` lands under 500,000 ET.
+ * plus the cache overhead measured in `docs/enrich-cost-measurements.md` lands under 200,000 ET.
  *
  * No `maxBudgetUsd`: a hard abort returns nothing usable, so it buys a cheaper failure rather than
  * a cheaper success. Left unset deliberately.
  */
 const TASK_BUDGET_TOKENS = 45_000;
 
-const IDENTITY =
-  'You expand specifications for collinson-issue-tracker. You are precise, you enumerate, and you ' +
-  'ask rather than invent.';
+/**
+ * The enricher's whole discipline — decide-record-hand-back, examples not descriptions, expand
+ * what is there and never add capability, the black-box rule, the register — lives in this file.
+ * A one-line identity was standing in for it until now, silently, with none of that reaching the
+ * model that writes the check.
+ */
+const IDENTITY = readAgentPrompt(ENRICHER_DEFINITION);
 
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
+  const accsOnly = args.includes('--accs');
   const mode: EnrichMode = args.includes('--no-questions') ? 'no-questions' : 'default';
   const force = args.includes('--force');
   const target = args.find((arg) => !arg.startsWith('--'));
 
   if (!target) {
-    consoleLogger.error(
-      'usage: pnpm enrich <spec number, slug, or path to spec.md> [--no-questions] [--force]',
-    );
+    consoleLogger.error('usage: pnpm enrich <spec> [--accs] [--no-questions] [--force]');
     return 1;
   }
 
   const path = resolveSpecPath(target);
-
   const model = 'claude-sonnet-5';
+
+  if (accsOnly) return runAccsOnly(path, model, target);
+
   const llm = new ClaudeCodeLlm(model, IDENTITY, { taskBudgetTokens: TASK_BUDGET_TOKENS });
+  llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });
   const progress = startProgress(`enriching ${path}`);
   const result = await enrich(path, llm, mode, {
     model,
@@ -104,6 +112,39 @@ async function main(): Promise<number> {
     'yellow',
   );
   note(`Read the report before the spec: pnpm verify ${target}`);
+  return 0;
+}
+
+async function runAccsOnly(path: string, model: string, target: string): Promise<number> {
+  const llm = new ClaudeCodeLlm(model, IDENTITY, { taskBudgetTokens: TASK_BUDGET_TOKENS });
+  llm.updateSystemPrompt({ rules: readAgentPrompt(PROJECT_CONTEXT) });
+  const progress = startProgress(`fixing the check for ${path}`);
+  const result = await enrichAccs(path, llm, {
+    model,
+    taskBudgetTokens: TASK_BUDGET_TOKENS,
+  }).finally(progress.stop);
+
+  if (result.status === 'nothing-to-fix') {
+    banner('NOTHING TO FIX', 'dim', path);
+    paragraph('The last verdict named no gaps in the check — there is nothing here to correct.');
+    return 0;
+  }
+
+  if (result.status === 'refused') {
+    banner('REFUSED', 'yellow', path);
+    paragraph(result.detail ?? 'could not fix the check.');
+    return 2;
+  }
+
+  consoleLogger.info(`usage: ${breakdown(llm)}`);
+  banner('FIXED', 'green', path, cost(result.effectiveTokens));
+  section(
+    'Files',
+    [{ body: 'The check only. Nothing else in the spec changed.', bullets: result.files }],
+    '+',
+    'green',
+  );
+  note(`Read the fix before trusting it: pnpm verify ${target}`);
   return 0;
 }
 
