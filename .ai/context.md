@@ -96,7 +96,7 @@ Locks (first match decides):
 - src/mock-github/ - Code for the fake github and mock data
 - src/issue-tracker/ - Code for the actual Issues Tracker
 - specs/ - SDD docs. 
-  Example: specs/021-issue-authors-whitelist -> spec.md, accs.bash, metrics/
+  Example: specs/021-issue-authors-whitelist/ -> spec.md, accs.md, outputs/-> metrics/, accs.bash, enriched-spec.md 
 - docs/ - Assessment, ADRs, documents in general
 
 # PROJECT PRINCIPLES:
@@ -107,9 +107,25 @@ Common rules:
 
 # Dictionary
 
+#### Specification File
+The document that represents how the world should look like after it has been applied.  
+
+It takes two forms:
+- spec.md - It's supposed to be 100% man-made, operates on the highest level of abstraction (prose). It's vague by design, it operates more on the functional concepts rather than technical. It grows iteratively, consecutive iterations never modify the existing content. 
+Breakpoints are added to separate iterations. Further iterations may override old statements.
+- enriched-spec.md - AI-processed spec.md that merges the breakpoints and expands on it significantly, operating on a much more architecturally technical level. The goal is to design how the spec.md ideas are to be implemented. 
+It establishes the contract - facades and abstractions that are to be implemented by the dev agents, and the implementation of which can be tested in the ACCS.  
+
 ##### Acceptance Criteria Check Script
 The script that verifies if the spec implementation is compliant with the idea behind the spec. Answers the question - "Does the current world state reflect the desired state of the world, as specified in this spec"?
 
+It takes two forms:
+- accs.md - Coexists nearby the spec.md, similar rules are applied excepts this one has no breakpoints - changes are made in place, checkpoints persisted in git.
+With this document, humans are able to describe how to verify that the state of the world matches the one desired as stated in the spec.md. If it's passing - the spec is applied and there's no need to reapply it.
+- ACCS Impl - Implementation of the accs.md, made by the AI. To build it, the AI needs both the accs.md to understand what actions are to be performed, but also spec-enriched.md, to make full use of the abstractions that are provided by it.
+It might be a single bash scripts, but it may also be a full suite of executables. The entry-point is always accs.bash though.
+
+Characteristic:
 - accs.md is written in prose by a human, and is then implemented by enrichment. With each iteration, accs.md is edited in place, artifacts are removed and recreated.
 - DO NOT confuse it with vitest unit tests, integration tests or even e2e tests. 
 - It's a bash scripts that the implementation is to be built around, not the test suite that tests the implementation. THAT DOES NOT NEGATE THE NEED FOR REGULAR TESTING!
@@ -117,3 +133,27 @@ The script that verifies if the spec implementation is compliant with the idea b
 - When writing ACCS, don't assume the code that could exist after the implementation. Implementation is ALWAYS non-deterministic, aiming blindly for imaginary hooks won't do. BDT (Behavior Driven Testing) concepts translate very well to the ACCS design thinking, because the assumptions it relies are based on abstractions, not physical components.
 - ACCS may return one of 2 results. 0 - the world matches the spec. 1 - it doesn't, there is a misalignment or the script is invalid.
 - It may not name anything inside src. You can use commands from package.json, .env vars, HTTP endpoints, stdout, stderr or other non-code-explicit sources.
+
+
+# Reporting
+Agentic scripts leave a report. Reports are stored in the metrics/ directory in the spec's output dir. It must include ET consumed and total time taken.
+Reports are meant to be read by human, so make them easy to read, don't skip any context (don't assume the human will have read anything outside of the man-made parts - they won't), and concise. No academic gibberish.
+
+Enrichment Report includes:
+- Assumptions Made - Specs are vague by design, so agents have to make implementation designs. Leave them here with the defaults, so they may be addressed in the next iteration of the spec.md
+- Expected Drawbacks - if any - Perfect is the enemy of Good, there is no perfect architecture, list the drawback here, this may affect the Reviewer's tolerance.
+- Design Flaws - if any - If the spec.md contains flaws, list them here and block the execution. 
+- Contract!!! The facades and abstraction the ACCS will test against and the dev agent will comply with.
+
+ACCS Implementation Report Includes:
+- General flow of the script.
+
+Verification Report includes:
+- Verdict
+- If rejected - scope, just ACCS or Enriched Spec + ACCS + reasons
+- Worth To Consider - Nuances that a person might be interested in addressing in the next breakpoint or accs.md
+
+Spec Implementation Report includes:
+- What was built, TL;DR
+- Decisions made outside of spec
+- Bugs and loopholes detected in the spec/accs

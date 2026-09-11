@@ -11,17 +11,27 @@ This repository holds two things:
    for my own use. The assessment is where it gets proven: every line of tracker code is meant to come
    out of a spec run through the framework.
 
-## Start with `CONCEPT.md`
+# DOCUMENT META - READ ME
 
-`CONCEPT.md` is the source of truth, and it's written entirely by hand. It holds the roadmap, what
-each stage builds, what the harness measures, how the framework works, and the identity of every
-agent.
+_Yes, read me. No part of this document was written using AI_
 
-Every prompt an agent sees is cut from it word for word:
+!!! This is a noAI scratchpad. Sections of this article are spread across the AI toolsets (system prompt, rules, hooks, identities) as-is, without AI adding, removing or altering any paragraphs.
 
-- `.ai/context.md` is shared by all agents
+I firmly believe that all the prompts have to be written by hand each time to maintain complete control over agentic behavior.
+
+The exceptions from this rule are the specfiles, which have human headers but their contents are enriched by AI - but even in that case, only the human-written part is immutable for the AI.
+
+## Where the prompts live
+
+Every prompt an agent sees is in `.ai/`, written by hand:
+
+- `.ai/context.md` is shared by all agents: the roadmap, what each stage builds, what the harness
+  measures, how the framework works
 - `.ai/identities/*.md` holds one identity per agent
 - `CLAUDE.md` imports both for the orchestrator
+
+These started as a single document, `CONCEPT.md`, split into the files above word for word. Its
+history is in git.
 
 The goal is that no prompt text is written by an AI, apart from specs, whose generated half is
 meant to be. That isn't true yet. These were written by an AI and are waiting to be rewritten:
@@ -34,25 +44,33 @@ meant to be. That isn't true yet. These were written by an AI and are waiting to
 
 A spec works like a Terraform file: it describes the state the world should be in.
 
-1. I write the **What I want** section of `specs/NNN-<slug>/spec.md`. I only ever append to it, never
-   edit what's there.
-2. `pnpm enrich NNN` has an agent expand it into a detailed spec. It also writes `accs.bash`, the
-   acceptance criteria check script (ACCS), which tests the running system from the outside.
-3. `pnpm verify NNN` has a second agent check that expansion against my section.
-   It sets the status to `approved` or `rejected`.
+1. I write two files in `specs/NNN-<slug>/`. `spec.md` holds the **What I want** section: I only
+   ever append to it, never edit what's there. `accs.md` says how to check that the world matches
+   the spec — the method behind the acceptance criteria check script (ACCS). I edit it in place, and
+   git keeps its history.
+2. `pnpm enrich NNN` runs two agents. The enricher expands `spec.md` into a detailed spec and writes
+   the contract in it: commands, variables, what the output looks like. The ACCS author then turns
+   `accs.md` into `accs.bash`, the ACCS, honouring that contract. Both land in `output/`, and neither
+   is written unless both succeed.
+3. `pnpm verify NNN` has a third agent check the expansion against `spec.md` and the script against
+   `accs.md` and the contract. It sets the status to `approved` or `rejected`, and on a rejection says
+   what has to be redone: the spec (both regenerate) or only the ACCS (`pnpm enrich:accs` repairs it
+   and leaves the approved contract alone). `pnpm verify NNN --loop <turns>` follows that advice
+   until the verdict is `approved` or the turns run out.
 4. `pnpm apply NNN` has an implementer agent write code until the ACCS passes.
 5. `pnpm commit` plans the commits, asks for approval, and makes them.
 
-`enrich`, `verify` and `apply` write a report into `specs/NNN-<slug>/metrics/`. None of them
-repeats work that doesn't need doing:
+Everything agents write sits in `specs/NNN-<slug>/output/`, reports in `output/metrics/`. None of
+the commands repeats work that doesn't need doing:
 
-- `enrich` skips if my section hasn't changed.
+- `enrich` skips if neither `spec.md` nor `accs.md` has changed.
 - `verify` reuses its last verdict while the spec is unchanged.
 - `apply` does nothing if the ACCS already passes.
-- `verify` and `apply` refuse a spec whose operator section changed after it was enriched.
+- `verify` and `apply` refuse a spec whose `spec.md` or `accs.md` changed after it was enriched.
 
-The ACCS returns `0` when the world matches the spec, `1` when it doesn't, and `2` when it couldn't
-decide. On `2`, a human looks at it.
+The ACCS exits `0` when the world matches the spec and `1` when it doesn't. There is no third
+answer: before implementation nothing it checks exists yet, which is simply "doesn't match". A check
+that hangs counts as `1` too.
 
 ## How to run it
 
@@ -66,7 +84,7 @@ pnpm check              # typecheck, lint, format, unit tests
 
 | Command                        | What it does                             | Budget              |
 | ------------------------------ | ---------------------------------------- | ------------------- |
-| `pnpm enrich <spec> [--force]` | expand my section into a spec and ACCS   | < 200k ET, ~5 min   |
+| `pnpm enrich <spec> [--force]` | expand spec.md and accs.md into output/  | < 200k ET, ~5 min   |
 | `pnpm enrich:accs <spec>`      | rewrite only the ACCS, using the verdict | —                   |
 | `pnpm verify <spec> [--force]` | review the expansion                     | < 120k ET, ~3 min   |
 | `pnpm apply <spec>`            | implement until the ACCS passes          | < 900k ET, ≤ 30 min |
@@ -114,7 +132,7 @@ Open questions I'd normally take to a stakeholder, with the answer I went with.
 - **Framework code:** mostly AI-written. I set the direction and the design, and the concept states
   this openly.
 - **Tracker code:** will be written by the framework's agents, from specs.
-- **Prompts:** written by me, in `CONCEPT.md`, apart from the exceptions listed above.
+- **Prompts:** written by me, in `.ai/`, apart from the exceptions listed above.
 
 The LLM port and the schema-to-prompt serializer were ported from a personal project of mine.
 
