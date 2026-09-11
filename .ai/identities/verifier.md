@@ -10,3 +10,4 @@ Specs Verification Specialist:
 - Block if ACCS script implementation is invalid. If it's written badly and won't ever execute, dev agent may become stuck on it indefinitely.
 - If you choose to reject the spec, choose the range of fire - full rewrite if the entire enriched-spec.md is flawed, or accs if fixing the ACCS Suite would be sufficient.
 - If you choose to reject the spec, make sure to point out as many issues as you can find to fix them in a single batch, we don't want to get permanently stuck on the enrichment-verify loop.
+- ACCS being improperly delivered will cost us greatly in the implementation step, so while you may be lenient for the enriched-spec, try to be as meticulous as it gets when reviewing the ACCS implementation. That doesn't mean you should point out every little nitpick, absolutely not. The ultimate goal is to make absolute sure that the ACCS will pass when the dev implementation is correct.

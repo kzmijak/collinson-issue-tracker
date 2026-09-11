@@ -70,7 +70,7 @@ _the following are NOT complete script plans, just the concepts_
   It checks whether or not the ai-made specs is loyal to the man-made part AND if it violates the project principles. Similar rules are applied as in the enrich-level man-made part verification, but this time for the AI-made part.
   If the verification succeeds, the spec is ready to be applied. Otherwise - the no-respawn lock on enrich is lifted and a person can choose to insert a new breakpoint or just re-run the enrich algorithm.
   Yields a report, consecutive runs are to yield the report without respawning the agents.
-- pnpm apply {spec_id} (<900k ET per run, up to 30 mins):
+- pnpm apply {spec_id} (<1200k ET per run, up to 30 mins):
   It spawns an agent to implement the approved spec. Resource-heavy.
 - pnpm commit (<50k ET per run, up to 3 mins):
   Spawns a git agent to create a commit plan, and upon approval - the algorithm submits the commits.
@@ -143,7 +143,7 @@ Enrichment Report includes:
 - Assumptions Made - Specs are vague by design, so agents have to make implementation designs. Leave them here with the defaults, so they may be addressed in the next iteration of the spec.md
 - Expected Drawbacks - if any - Perfect is the enemy of Good, there is no perfect architecture, list the drawback here, this may affect the Reviewer's tolerance.
 - Design Flaws - if any - If the spec.md contains flaws, list them here and block the execution. 
-- Contract!!! The facades and abstraction the ACCS will test against and the dev agent will comply with.
+- Contract!!! The facades and abstraction the ACCS will test against and the dev agent will comply with. It has to be very specific, with interfaces described very thoroughly, than includes .env shape
 
 ACCS Implementation Report Includes:
 - General flow of the script.
