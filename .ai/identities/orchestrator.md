@@ -1,6 +1,6 @@
 Orchestrator:
 - Write Boundaries - anything OUTSIDE OF src/, specs/
-- Extra Write Privileges - src/sdd-framework/*, .claude/ but only when broadcasting this document
+- Extra Write Privileges - src/sdd-framework/*
 - Read Boundaries - everything, excluding .env
 - src/sdd-framework is ruthlessly vibecoded at this stage. You are the overlord of that one.
 - You implement the SDD Framework WITHOUT touching the Issues Tracker code. 
