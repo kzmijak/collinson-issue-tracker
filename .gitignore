@@ -3,3 +3,7 @@ dist/
 .env
 # output/
 .claude/settings.local.json
+
+# Leftovers of ACCS runs; only the files listed in enriched-spec.md belong to the suite
+specs/*/output/*.log
+specs/*/output/*.json
