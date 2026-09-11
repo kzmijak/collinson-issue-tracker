@@ -1,10 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ModelContractError } from '../../../src/sdd-framework/spec/EnrichPrompt.js';
 import { StaleEnrichmentError, verify } from '../../../src/sdd-framework/spec/verify.js';
-import { headSha, splitSpec } from '../../../src/sdd-framework/spec/SpecFile.js';
+import { specFixture } from './specFixture.js';
 import type { Llm, SystemPromptData, TokenUsage } from '../../../src/sdd-framework/llm/Llm.js';
 
 /** Mirrors ClaudeCodeLlm: usage lands before the call can throw, since the SDK already returned. */
@@ -32,30 +31,11 @@ class ThrowsAfterSpending implements Llm {
   }
 }
 
-const HEAD = [
-  '# 001 — Thing',
-  '',
-  '## What I want',
-  '',
-  '### 2026-09-09 — x',
-  '',
-  'prose',
-  '',
-  '<!-- enrich:generated -->',
-].join('\n');
-
 /** A spec with an existing enrichment record, since `amendMetrics` has nothing to add to otherwise. */
-function specWithEnrichment(sourceSha = headSha(splitSpec(HEAD).head)): string {
-  const dir = mkdtempSync(join(tmpdir(), 'verify-'));
-  const path = join(dir, 'spec.md');
+function specWithEnrichment(sourceSha?: string): string {
+  const { path, output } = specFixture({ enriched: { status: 'draft', sourceSha } });
 
-  writeFileSync(
-    path,
-    [HEAD, '', '<!-- enrich:meta', `source-sha: ${sourceSha}`, 'status: draft', '-->'].join('\n'),
-    'utf8',
-  );
-
-  const metricsDir = join(dir, 'metrics');
+  const metricsDir = join(output, 'metrics');
   mkdirSync(metricsDir, { recursive: true });
   writeFileSync(
     join(metricsDir, '2026-09-09T00-00-00Z--x.json'),
@@ -82,7 +62,7 @@ describe('verify', () => {
 
     await expect(verify(path, llm)).rejects.toThrow(ModelContractError);
 
-    const metricsDir = join(path, '..', 'metrics');
+    const metricsDir = join(path, '..', 'output', 'metrics');
     const files = readdirSync(metricsDir).sort();
     const record = JSON.parse(readFileSync(join(metricsDir, files.at(-1)!), 'utf8'));
 
@@ -91,12 +71,25 @@ describe('verify', () => {
     expect(record.verification).toBeUndefined();
   });
 
-  it('refuses a spec whose operator section changed since it was enriched, before spending anything', async () => {
+  it('refuses a spec whose spec.md or accs.md changed since it was enriched, before spending anything', async () => {
     const llm = new ThrowsAfterSpending();
 
     await expect(verify(specWithEnrichment('aaaaaaaaaaaa'), llm)).rejects.toThrow(
       StaleEnrichmentError,
     );
     expect(llm.lastUsage).toBeNull();
+  });
+
+  it('refuses a spec that has never been enriched', async () => {
+    const llm = new ThrowsAfterSpending();
+
+    await expect(verify(specFixture().path, llm)).rejects.toThrow(/never been enriched/);
+  });
+
+  it('refuses a spec with no accs.md, since there is nothing to check the ACCS against', async () => {
+    const llm = new ThrowsAfterSpending();
+    const { path } = specFixture({ accs: null, enriched: { status: 'draft' } });
+
+    await expect(verify(path, llm)).rejects.toThrow(/accs\.md does not exist/);
   });
 });

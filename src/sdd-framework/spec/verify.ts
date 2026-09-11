@@ -1,12 +1,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import type { Llm } from '../llm/Llm.js';
 import { readAgentPrompt } from './agentPrompt.js';
 import { amendMetrics, latestMetricsPath, type EnrichMetrics } from './metrics.js';
 import { readArtefacts } from './readArtefacts.js';
 import { VerifyPrompt } from './VerifyPrompt.js';
 import type { Verdict } from './schemas/Verdict.js';
-import { isEnrichmentStale, setStatus, specSha, splitSpec } from './SpecFile.js';
+import { setStatus, specSha } from './SpecFile.js';
+import { describeSpec, isStale, readSpecFolder } from './specFolder.js';
 
 export const REVIEWER_DEFINITION = '.ai/identities/verifier.md';
 
@@ -20,28 +20,35 @@ export interface VerifyResult extends Verdict {
 export class StaleEnrichmentError extends Error {}
 
 export async function verify(path: string, llm: Llm, force = false): Promise<VerifyResult> {
-  const source = await readFile(path, 'utf8');
-  if (isEnrichmentStale(splitSpec(source))) {
+  const folder = await readSpecFolder(path);
+  const { output } = folder.paths;
+
+  if (isStale(folder)) {
     throw new StaleEnrichmentError(
-      'the operator section changed since the last enrichment — run `pnpm enrich` first.',
+      folder.enriched
+        ? 'spec.md or accs.md changed since the last enrichment — run `pnpm enrich` first.'
+        : 'this spec has never been enriched — run `pnpm enrich` first.',
     );
   }
-  const sha = specSha(source);
+  const artefacts = await readArtefacts(output);
+  const sha = specSha(folder.operatorSection, folder.accs, folder.enriched, artefacts);
 
-  const stored = force ? null : await storedVerdict(dirname(path), sha);
+  const stored = force ? null : await storedVerdict(output, sha);
   if (stored) return { ...stored, effectiveTokens: 0, attachedTo: null, reused: true };
 
   const instructions = readAgentPrompt(REVIEWER_DEFINITION, { without: ['Output format'] });
-  const artefacts = await readArtefacts(dirname(path));
 
   try {
-    const verdict = await llm.prompt(new VerifyPrompt(source, artefacts, instructions), {
-      fresh: true,
-    });
+    const verdict = await llm.prompt(
+      new VerifyPrompt(describeSpec(folder), artefacts, instructions),
+      {
+        fresh: true,
+      },
+    );
     const effectiveTokens = llm.lastEffectiveTokens;
 
-    await writeFile(path, setStatus(source, verdict.verdict), 'utf8');
-    const attachedTo = await amendMetrics(dirname(path), {
+    await writeFile(folder.paths.enriched, setStatus(folder.enriched, verdict.verdict), 'utf8');
+    const attachedTo = await amendMetrics(output, {
       verification: {
         at: new Date().toISOString(),
         verdict: verdict.verdict,
@@ -49,6 +56,7 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
         mustFix: verdict.mustFix,
         shouldFix: verdict.shouldFix,
         shouldKnow: verdict.shouldKnow,
+        fix: verdict.fix,
         effectiveTokens,
         specSha: sha,
       },
@@ -59,7 +67,7 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
     // The client records usage as soon as its query returns, before parsing can reject the shape —
     // so a call that threw here still spent real tokens, and losing that number on top of the
     // failure is a second, quieter defect layered on the first.
-    await amendMetrics(dirname(path), {
+    await amendMetrics(output, {
       verificationFailure: {
         at: new Date().toISOString(),
         effectiveTokens: llm.lastEffectiveTokens,
@@ -72,12 +80,12 @@ export async function verify(path: string, llm: Llm, force = false): Promise<Ver
 }
 
 /** A verdict already paid for, when the spec has not changed since. */
-async function storedVerdict(specDir: string, sha: string): Promise<Verdict | null> {
-  const path = await latestMetricsPath(specDir);
+async function storedVerdict(outputDir: string, sha: string): Promise<Verdict | null> {
+  const path = await latestMetricsPath(outputDir);
   if (!path) return null;
 
   const record = JSON.parse(await readFile(path, 'utf8')) as EnrichMetrics;
   const previous = record.verification;
 
-  return previous?.specSha === sha ? { ...previous } : null;
+  return previous?.specSha === sha ? { ...previous, fix: previous.fix ?? 'spec' } : null;
 }
