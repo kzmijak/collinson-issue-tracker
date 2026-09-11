@@ -1,6 +1,6 @@
 # 0002 — The delivery stage produces a plan, not executed code
 
-Status: accepted · 2026-09-06
+Status: accepted · 2026-09-06 · superseded 2026-09-11 — see `PLAN.md`, "How the plan changed"
 
 ## Context
 

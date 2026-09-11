@@ -1,6 +1,6 @@
 # 0001 — The framework is scaffolding; the adapter is the deliverable
 
-Status: accepted · 2026-09-06
+Status: accepted · 2026-09-06 · superseded 2026-09-11 — see `PLAN.md`, "How the plan changed"
 
 ## Context
 
