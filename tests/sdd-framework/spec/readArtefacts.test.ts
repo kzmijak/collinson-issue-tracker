@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { readArtefacts } from '../../../src/sdd-framework/spec/readArtefacts.js';
 
 describe('readArtefacts', () => {
-  it('reads the whole ACCS suite, nested files included, but not the tool’s own files', async () => {
+  it('reads the files the enriched spec lists, nested ones included, and nothing else', async () => {
     const output = mkdtempSync(join(tmpdir(), 'output-'));
     mkdirSync(join(output, 'suite'), { recursive: true });
     mkdirSync(join(output, 'metrics'), { recursive: true });
@@ -13,12 +13,17 @@ describe('readArtefacts', () => {
     writeFileSync(join(output, 'suite', 'check.mjs'), 'export {};');
     writeFileSync(join(output, 'enriched-spec.md'), 'the spec');
     writeFileSync(join(output, 'metrics', 'run.json'), '{}');
+    writeFileSync(join(output, 'tracker.accs.log'), 'leftover log');
 
-    const text = await readArtefacts(output);
+    const text = await readArtefacts(output, [
+      join(output, 'accs.bash'),
+      join(output, 'suite', 'check.mjs'),
+    ]);
 
     expect(text).toContain('### accs.bash');
     expect(text).toContain('### suite/check.mjs');
     expect(text).not.toContain('the spec');
     expect(text).not.toContain('run.json');
+    expect(text).not.toContain('leftover log');
   });
 });

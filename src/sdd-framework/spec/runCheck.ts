@@ -13,10 +13,18 @@ export interface CheckResult {
  * exiting is not the same as its children being gone. Sweeping the group either way is what stops
  * one idle survivor accumulating per run.
  */
-export function runCheck(script: string, timeoutMs: number): Promise<CheckResult> {
+export function runCheck(
+  script: string,
+  timeoutMs: number,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<CheckResult> {
   return new Promise((resolve) => {
     const startedAt = Date.now();
-    const child = spawn('bash', [script], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('bash', [script], {
+      detached: true,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     const chunks: string[] = [];
     let timedOut = false;
 

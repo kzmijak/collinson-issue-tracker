@@ -27,6 +27,8 @@ export interface Verification {
   shouldKnow: Finding[];
   /** What the verifier says has to be redone. Anything but 'accs' — older records included — is 'full'. */
   fix?: 'full' | 'accs' | 'spec';
+  /** Who sent the spec back. Missing — older records — means the verifier. */
+  by?: 'verifier' | 'implementer';
   effectiveTokens: number;
   /** The spec this verdict is about, so verifying twice over unchanged content costs once. */
   specSha: string;
@@ -43,7 +45,8 @@ export interface Application {
   summary: string | null;
   files: string[];
   picks: ImplementationPick[];
-  specIssues: string[];
+  findings: Finding[];
+  fix: 'none' | 'full' | 'accs';
   blocked: string | null;
   effectiveTokens: number;
   /** The ceiling the run was given, so an overshoot is visible rather than needing recomputing. */

@@ -80,7 +80,7 @@ export function accsFixReport(run: ReportRun, fixedAfter: string, accsFlow: stri
 
 export function verifyReport(run: ReportRun, verdict: Verdict): string {
   const rejected = verdict.verdict === 'rejected';
-  const scope = verdict.fix === 'accs' ? 'the ACCS only' : 'the enriched spec and the ACCS';
+  const scope = scopeOf(verdict.fix);
 
   return document(`Verification report — ${run.spec}`, run, verdict.verdict, [
     section('Summary', [verdict.summary]),
@@ -112,15 +112,19 @@ export function applyReport(
         ),
       ),
     ),
-    section(
-      'Bugs and loopholes in the spec or the ACCS',
-      bullets(implementation?.specIssues ?? []),
-    ),
+    ...(implementation && implementation.fix !== 'none'
+      ? [section('Sent back', [`Redo ${scopeOf(implementation.fix)}.`])]
+      : []),
+    section('Bugs and loopholes in the spec or the ACCS', findings(implementation?.findings ?? [])),
     ...(implementation?.blocked
       ? [section('Why it stopped', [implementation.blocked, implementation.remedy ?? ''])]
       : []),
     section('Files changed', bullets(implementation?.files ?? [])),
   ]);
+}
+
+function scopeOf(fix: 'full' | 'accs'): string {
+  return fix === 'accs' ? 'the ACCS only' : 'the enriched spec and the ACCS';
 }
 
 function document(title: string, run: ReportRun, outcome: string, sections: string[][]): string {

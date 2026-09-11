@@ -82,14 +82,18 @@ describe('reports', () => {
         summary: 'Built the tracker.',
         files: ['src/issue-tracker/main.ts'],
         picks: [],
-        specIssues: ['accs.md never checks closed issues'],
+        findings: [
+          { area: 'Coverage', quote: null, problem: 'accs.md never checks closed issues' },
+        ],
+        fix: 'accs',
         blocked: null,
         remedy: null,
       },
     });
 
     expect(text).toContain('converged after 1 round');
-    expect(text).toContain('- accs.md never checks closed issues');
+    expect(text).toContain('- **Coverage** accs.md never checks closed issues');
+    expect(text).toContain('Redo the ACCS only.');
   });
 
   it('writes a report next to the metrics and hands back the latest of a kind', async () => {
