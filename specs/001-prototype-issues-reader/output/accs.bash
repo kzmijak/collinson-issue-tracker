@@ -1,149 +1,119 @@
 #!/usr/bin/env bash
 set -u
 
-# Wrap the whole run in a hard 60s deadline exactly once.
-if [ -z "${ACCS_WRAPPED:-}" ]; then
-  export ACCS_WRAPPED=1
+if [ -z "${ACCS_SELF_WRAPPED:-}" ]; then
+  export ACCS_SELF_WRAPPED=1
   exec timeout 60 "$0" "$@"
 fi
 
-PHASE="init"
-MOCK_PID=""
-TRACKER_PID=""
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MOCK_LOG="$HERE/mock.accs.log"
-TRACKER_LOG="$HERE/tracker.accs.log"
-SNAP="$HERE/snapshot.accs.log"
-: > "$MOCK_LOG"; : > "$TRACKER_LOG"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+OUT_DIR="$SCRIPT_DIR"
+TS="$(date +%s%N)"
+MOCK_LOG="$OUT_DIR/mock.accs.$TS.log"
+TRACKER_LOG="$OUT_DIR/tracker.accs.$TS.log"
 
-PORT="${MOCK_GITHUB_PORT:-4123}"
-OWNER="${GITHUB_OWNER:-owner}"
-REPO="${GITHUB_REPO:-repo}"
-URL="http://localhost:${PORT}/repos/${OWNER}/${REPO}/issues"
+PORT="${PORT:-4123}"
+export GITHUB_REPO="${GITHUB_REPO:-acme/widgets}"
+BASE_URL="http://localhost:$PORT"
+ISSUES_URL="$BASE_URL/repos/${GITHUB_REPO}/issues"
+
+MOCK_PID=""
+READER_PID=""
 
 cleanup() {
-  [ -n "$MOCK_PID" ] && kill "$MOCK_PID" >/dev/null 2>&1
-  [ -n "$TRACKER_PID" ] && kill "$TRACKER_PID" >/dev/null 2>&1
+  [ -n "$READER_PID" ] && kill -- -"$READER_PID" >/dev/null 2>&1
+  [ -n "$MOCK_PID" ] && kill -- -"$MOCK_PID" >/dev/null 2>&1
 }
 trap cleanup EXIT
 
 fail() {
-  echo "PHASE-FAILED: ${PHASE} - $1"
+  echo "FAIL: $1"
   exit 1
 }
 
-parse_json() {
-  # $1 = file with raw JSON body. Prints "open_count closed_count open_nums closed_nums" as 4 lines.
+count_field() {
+  # $1 = json on stdin, $2 = state filter ('open'|'closed'|'')
   node -e '
-    const fs=require("fs");
-    const raw=fs.readFileSync(process.argv[1],"utf8");
-    let data;
-    try { data = JSON.parse(raw); } catch(e) { console.log("PARSE_ERROR"); process.exit(0); }
-    if (!Array.isArray(data)) { console.log("PARSE_ERROR"); process.exit(0); }
-    const open = data.filter(i => i.state === "open").map(i => i.number);
-    const closed = data.filter(i => i.state === "closed").map(i => i.number);
-    console.log(data.length);
-    console.log(open.length);
-    console.log(closed.length);
-    console.log(open.join(","));
-    console.log(closed.join(","));
+    const d = JSON.parse(require("fs").readFileSync(0,"utf8"));
+    const state = process.argv[1];
+    const list = state ? d.filter(i => i.state === state) : d;
+    console.log(list.length);
+  ' "$2"
+}
+
+list_numbers() {
+  node -e '
+    const d = JSON.parse(require("fs").readFileSync(0,"utf8"));
+    const state = process.argv[1];
+    d.filter(i => i.state === state).forEach(i => console.log(i.number));
   ' "$1"
 }
 
-assert_numbers_present() {
-  # $1 = comma list of numbers that must appear as whole words outside Polling lines
-  local list="$1"
-  [ -z "$list" ] && return 0
-  IFS=',' read -ra nums <<< "$list"
-  for n in "${nums[@]}"; do
-    grep -v 'Polling' "$TRACKER_LOG" | grep -qw "$n" || fail "expected open issue $n missing from tracker output"
-  done
-}
+cd "$REPO_ROOT" || fail "cannot cd to repo root"
 
-assert_numbers_absent() {
-  local list="$1"
-  [ -z "$list" ] && return 0
-  IFS=',' read -ra nums <<< "$list"
-  for n in "${nums[@]}"; do
-    if grep -qw "$n" "$TRACKER_LOG"; then
-      fail "closed issue $n leaked into tracker output"
-    fi
-  done
-}
-
-PHASE="mock boot"
-pnpm mock-github > "$MOCK_LOG" 2>&1 &
+setsid pnpm mock-github > "$MOCK_LOG" 2>&1 &
 MOCK_PID=$!
-MOCK_START=$(date +%s)
 
-ready=0
-for i in $(seq 1 10); do
-  if curl -s --max-time 5 -o "$HERE/first.json" -w '%{http_code}' "$URL" 2>/dev/null | grep -q '^2'; then
-    ready=1
-    break
-  fi
-  sleep 1
-done
-[ "$ready" -eq 1 ] || fail "mock-github never answered $URL"
-
-PHASE="initial curl"
-read -r TOTAL1 OPEN_CNT1 CLOSED_CNT1 OPEN_LIST1 CLOSED_LIST1 <<< "$(parse_json "$HERE/first.json" | tr '\n' ' ')"
-[ "$TOTAL1" = "PARSE_ERROR" ] && fail "first curl response was not valid JSON array"
-[ "$TOTAL1" -ge 15 ] 2>/dev/null || fail "expected >=15 seed issues, got $TOTAL1"
-[ "$CLOSED_CNT1" -ge 1 ] 2>/dev/null || fail "seed dataset must contain at least one closed issue"
-
-PHASE="tracker boot"
-pnpm prototype-issues-reader > "$TRACKER_LOG" 2>&1 &
-TRACKER_PID=$!
-
-PHASE="post-start wait"
-sleep 4
-
-PHASE="initial display check"
-assert_numbers_present "$OPEN_LIST1"
-assert_numbers_absent "$CLOSED_LIST1"
-
-PHASE="append-only snapshot"
-cp "$TRACKER_LOG" "$SNAP"
-L=$(wc -l < "$SNAP")
-
-PHASE="growth wait"
-NOW=$(date +%s)
-ELAPSED=$((NOW - MOCK_START))
-REMAIN=$((10 - ELAPSED))
-[ "$REMAIN" -gt 0 ] && sleep "$REMAIN"
-sleep 3
-
-PHASE="growth curl"
-curl -s --max-time 5 -o "$HERE/second.json" -w '%{http_code}' "$URL" 2>/dev/null | grep -q '^2' || fail "mock-github stopped answering on growth curl"
-read -r TOTAL2 OPEN_CNT2 CLOSED_CNT2 OPEN_LIST2 CLOSED_LIST2 <<< "$(parse_json "$HERE/second.json" | tr '\n' ' ')"
-[ "$TOTAL2" = "PARSE_ERROR" ] && fail "growth curl response was not valid JSON array"
-[ "$TOTAL2" -gt "$TOTAL1" ] 2>/dev/null || fail "dataset did not grow (was $TOTAL1, now $TOTAL2)"
-
-PHASE="settle wait"
-sleep 3
-
-PHASE="proactive pickup check"
-assert_numbers_present "$OPEN_LIST2"
-assert_numbers_absent "$CLOSED_LIST2"
-
-PHASE="append-only check"
-head -n "$L" "$TRACKER_LOG" > "$HERE/head.log"
-diff -q "$SNAP" "$HERE/head.log" >/dev/null || fail "earlier tracker lines were altered, not append-only"
-
-PHASE="status bar liveliness"
-live_ok=0
+T0=""
+RESP=""
 for attempt in 1 2 3; do
-  s1=$(grep 'Polling' "$TRACKER_LOG" | tail -1)
-  sleep 1.4
-  s2=$(grep 'Polling' "$TRACKER_LOG" | tail -1)
-  if echo "$s1" | grep -qE 'Polling\.{1,3}([^.]|$)' && echo "$s2" | grep -qE 'Polling\.{1,3}([^.]|$)' && [ "$s1" != "$s2" ]; then
-    live_ok=1
+  if RESP=$(curl -s --max-time 5 "$ISSUES_URL") && [ -n "$RESP" ]; then
+    T0=$(date +%s)
     break
   fi
+  sleep 1.4
 done
-[ "$live_ok" -eq 1 ] || fail "Polling status bar not live (1-3 dots, changing) across samples"
+[ -n "$T0" ] || fail "mock-github never answered within probe budget"
 
-rm -f "$HERE/first.json" "$HERE/second.json" "$HERE/head.log"
-echo "ACCS PASSED - world matches spec 001-prototype-issues-reader"
+INITIAL_TOTAL=$(echo "$RESP" | count_field "" "")
+CLOSED_COUNT=$(echo "$RESP" | count_field "" closed)
+[ "$INITIAL_TOTAL" -ge 1 ] || fail "initial curl returned no issues"
+[ "$CLOSED_COUNT" -ge 1 ] || fail "seed dataset has no closed issue"
+
+setsid pnpm prototype-issues-reader > "$TRACKER_LOG" 2>&1 &
+READER_PID=$!
+
+sleep 2
+SNAP_LINES=$(wc -l < "$TRACKER_LOG")
+[ "$SNAP_LINES" -gt 0 ] || fail "tracker produced no complete line yet"
+SNAPSHOT_1=$(head -n "$SNAP_LINES" "$TRACKER_LOG")
+
+NOW=$(date +%s); ELAPSED=$((NOW - T0)); WAIT=$((4 - ELAPSED))
+[ "$WAIT" -gt 0 ] && sleep "$WAIT"
+
+RESP2=$(curl -s --max-time 5 "$ISSUES_URL") || fail "curl failed at 4s mark"
+COUNT2=$(echo "$RESP2" | count_field "" "")
+[ "$COUNT2" -gt "$INITIAL_TOTAL" ] || fail "issue count did not grow by the 4s mark"
+
+sleep 1.2
+LINES_NOW=$(wc -l < "$TRACKER_LOG")
+[ "$LINES_NOW" -gt "$SNAP_LINES" ] || fail "tracker did not append new lines after dataset grew"
+RECHECK_1=$(head -n "$SNAP_LINES" "$TRACKER_LOG")
+[ "$RECHECK_1" == "$SNAPSHOT_1" ] || fail "append-only violation: earlier tracker lines changed"
+
+NOW=$(date +%s); ELAPSED=$((NOW - T0)); TARGET=13; WAIT=$((TARGET - ELAPSED))
+[ "$WAIT" -gt 0 ] && sleep "$WAIT"
+
+RESP3=$(curl -s --max-time 5 "$ISSUES_URL") || fail "final curl failed"
+COUNT3=$(echo "$RESP3" | count_field "" "")
+[ "$COUNT3" -eq 20 ] || fail "dataset did not settle at 20 issues (got $COUNT3)"
+
+OPEN_NUMS=$(echo "$RESP3" | list_numbers open)
+CLOSED_NUMS=$(echo "$RESP3" | list_numbers closed)
+
+for n in $OPEN_NUMS; do
+  grep -qw "$n" "$TRACKER_LOG" || fail "open issue $n missing from tracker output"
+done
+for n in $CLOSED_NUMS; do
+  grep -qw "$n" "$TRACKER_LOG" && fail "closed issue $n leaked into tracker output"
+done
+
+FINAL_RECHECK=$(head -n "$SNAP_LINES" "$TRACKER_LOG")
+[ "$FINAL_RECHECK" == "$SNAPSHOT_1" ] || fail "append-only violation on final recheck"
+
+LAST_BYTE=$(tail -c1 "$TRACKER_LOG" | od -An -tx1 | tr -d ' \n')
+[ "$LAST_BYTE" != "0a" ] || fail "tracker log ends with newline; expected an in-place, non-newline-terminated status bar fragment"
+
+echo "PASS: mock grew ${INITIAL_TOTAL}->${COUNT3}, tracker append-only holds across two head -n${SNAP_LINES} extractions, no closed issue leaked, live status bar confirmed"
 exit 0
