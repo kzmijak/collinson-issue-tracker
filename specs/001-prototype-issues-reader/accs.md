@@ -4,6 +4,7 @@
 - Assure that 4 seconds have passed since initial GitHub curl, make another fetch - there should be more entries than the last time this time.
 - Issues Tracker console should not be prompted to fetch, it should be doing it proactively. Thus - once again, there should be more entries in the console at this point than before.
 - All throughout, there should always be a status bar at the bottom of the console. There should be a simple Polling indicator.
+- You don't make the contract. Make use of what's in the enriched-spec, don't extend the contract that it establishes.
 
 Example (low fidelity):
 
