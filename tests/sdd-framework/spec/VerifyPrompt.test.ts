@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest';
+import { ModelContractError } from '../../../src/sdd-framework/spec/EnrichPrompt.js';
+import { VerifyPrompt } from '../../../src/sdd-framework/spec/VerifyPrompt.js';
+
+const prompt = new VerifyPrompt(
+  '# 001 — Thing\n\nprose',
+  '### accs.bash\n\nexit 1',
+  'instructions',
+);
+
+describe('VerifyPrompt', () => {
+  it('accepts the fully-shaped answer', () => {
+    const result = prompt.parseOutput(
+      JSON.stringify({
+        verdict: 'approved',
+        summary: 'fine',
+        mustFix: [],
+        shouldFix: [{ area: 'Scope', quote: null, problem: 'x' }],
+        shouldKnow: [{ area: 'Note', quote: null, problem: 'y' }],
+      }),
+    );
+
+    expect(result.verdict).toBe('approved');
+  });
+
+  it('forces "rejected" when a mustFix is present, regardless of the stated verdict', () => {
+    const result = prompt.parseOutput(
+      JSON.stringify({
+        verdict: 'approved',
+        summary: 'fine',
+        mustFix: [{ area: 'Falsifiability', quote: 'x', problem: 'y' }],
+        shouldFix: [],
+        shouldKnow: [],
+      }),
+    );
+
+    expect(result.verdict).toBe('rejected');
+  });
+
+  it('accepts a bare string in shouldFix/shouldKnow, the exact shape one real run sent', () => {
+    // The contract shows the object shape only once, for mustFix, and a model can send the other
+    // two lists as plain strings instead — this run did, and the old schema threw away a correct
+    // "rejected" verdict with two solid mustFix findings over it.
+    const result = prompt.parseOutput(
+      JSON.stringify({
+        verdict: 'rejected',
+        summary: 'two behaviours are never exercised',
+        mustFix: [
+          { area: 'Falsifiability', quote: 'shows an error indication', problem: 'never checked' },
+        ],
+        shouldFix: [],
+        shouldKnow: [
+          'Traceability not checked — I was not given the conversation this spec was agreed in.',
+          'A carriage-return redraw could interleave with the issue-line count in ways the check does not anticipate.',
+        ],
+      }),
+    );
+
+    expect(result.verdict).toBe('rejected');
+    expect(result.mustFix).toHaveLength(1);
+    expect(result.shouldKnow).toEqual([
+      {
+        area: 'Note',
+        quote: null,
+        problem:
+          'Traceability not checked — I was not given the conversation this spec was agreed in.',
+      },
+      {
+        area: 'Note',
+        quote: null,
+        problem:
+          'A carriage-return redraw could interleave with the issue-line count in ways the check does not anticipate.',
+      },
+    ]);
+  });
+
+  it('still refuses a genuinely wrong shape, such as a missing field', () => {
+    expect(() =>
+      prompt.parseOutput(
+        JSON.stringify({ verdict: 'approved', mustFix: [], shouldFix: [], shouldKnow: [] }),
+      ),
+    ).toThrow(ModelContractError);
+  });
+
+  it('shows the object shape for all three lists, not only mustFix', () => {
+    const shapes = VerifyPrompt.outputSpecification.match(/"area":/g) ?? [];
+
+    expect(shapes).toHaveLength(3);
+  });
+});
