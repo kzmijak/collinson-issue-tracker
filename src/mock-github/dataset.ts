@@ -25,7 +25,7 @@ const TITLES: readonly string[] = [
   'Support pagination on /issues',
   'Reader should ignore pull requests entirely',
   'Investigate flaky proxy outage test',
-  'Add ETag support to reduce polling cost',
+  'Add ETag support to reduce request cost',
   'Allow overriding POLL_INTERVAL_MS at runtime',
   'Mock dataset should mirror real issue shape',
   'Terminal output breaks when not a TTY',
@@ -35,7 +35,7 @@ const TITLES: readonly string[] = [
   'Add a health check endpoint to the simulator',
   'Growing dataset should stop at 20 issues',
   'Backoff should reset immediately after success',
-  'Simulator should bind before the reader starts polling',
+  'Simulator should bind before the reader starts fetching',
   'Add unit tests for the issue diffing logic',
   'Write the acceptance check for this spec',
 ];
@@ -47,7 +47,7 @@ export const ALL_ISSUES: readonly MockIssue[] = TITLES.map((title, index) => {
     id: 900_000 + number,
     number,
     title,
-    state: 'open',
+    state: number === 3 ? 'closed' : 'open',
     body: `Fixture body for issue #${number}.`,
     user: { login: 'collinson-bot' },
     created_at: new Date(Date.UTC(2026, 0, number)).toISOString(),
@@ -57,7 +57,7 @@ export const ALL_ISSUES: readonly MockIssue[] = TITLES.map((title, index) => {
 export const INITIAL_VISIBLE_COUNT = 15;
 export const MAX_VISIBLE_COUNT = 20;
 export const GROWTH_STEP = 1;
-export const GROWTH_INTERVAL_MS = 4_000;
+export const GROWTH_INTERVAL_MS = 2_000;
 
 /** Pure growth step, capped at the dataset's total size — easy to unit test without real timers. */
 export function growVisibleCount(current: number): number {
