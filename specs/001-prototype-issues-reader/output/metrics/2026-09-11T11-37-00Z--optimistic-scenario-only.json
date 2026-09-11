@@ -1,0 +1,66 @@
+{
+  "at": "2026-09-11T11:37:00.425Z",
+  "durationMs": 61978,
+  "entry": "2026-09-09 — Optimistic Scenario Only",
+  "sourceSha": "a31f9c7bb16c",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 75,
+    "outputTokens": 25205,
+    "cacheReadTokens": 22271,
+    "cacheCreationTokens": 19702
+  },
+  "effectiveTokens": 82456,
+  "outcome": "written",
+  "files": [
+    "specs/001-prototype-issues-reader/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 0,
+    "assumptions": 3,
+    "decisions": 4,
+    "behaviours": 5,
+    "cases": 7,
+    "doneWhen": 2,
+    "outOfScope": 5,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-11T11:37:17.029Z",
+    "verdict": "rejected",
+    "summary": "The accs.bash has no timeout on curl or on waiting for the two background processes to come up, so a slow/hung mock-github or tracker start makes the whole check hang forever instead of failing — exactly what the dictionary says must be blocked. It also never checks that only active/open issues are shown, though the spec explicitly requires that filter.",
+    "mustFix": [
+      {
+        "area": "Method",
+        "quote": "IDS_T0=\"$(curl -sf \"$API_URL\" | ids_from_json)\" || fail \"mock GitHub API did not respond with issues at startup\"",
+        "problem": "curl has no --max-time, and there's no overall script timeout, so if mock-github never comes up or hangs, this call blocks indefinitely instead of failing. That is the exact 'stuck forever' failure mode ACCS scripts must avoid."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Coverage",
+        "quote": "- Only display active issues.",
+        "problem": "The ACCS never seeds or checks for a closed issue, so a tracker that prints closed issue numbers too would still pass. The 'active only' requirement from the man-made spec is effectively unverified."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "console.log(arr.map(i=>i.number ?? i.id).join(\"\\n\"));",
+        "problem": "Falling back to `.id` when `.number` is absent is an enrich-time assumption about the mock's JSON shape, not stated in the man-made prose. Fine as a documented flag, just worth the operator's eyes."
+      }
+    ],
+    "effectiveTokens": 35924.5,
+    "specSha": "f749d635eb82"
+  },
+  "commits": [
+    {
+      "at": "2026-09-11T12:10:06.470Z",
+      "sha": "4ed6220",
+      "subject": "spec(reader): trim the prototype issues reader spec to the operator section and add accs.md"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "at": "2026-09-11T11:35:37.755Z",
+  "durationMs": 108604,
+  "entry": "2026-09-09 — Optimistic Scenario Only",
+  "sourceSha": "a31f9c7bb16c",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 18638,
+    "cacheReadTokens": 13241,
+    "cacheCreationTokens": 13730
+  },
+  "effectiveTokens": 132051,
+  "outcome": "written",
+  "files": [
+    "specs/001-prototype-issues-reader/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 0,
+    "assumptions": 3,
+    "decisions": 4,
+    "behaviours": 5,
+    "cases": 7,
+    "doneWhen": 2,
+    "outOfScope": 5,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-11T11:35:58.444Z",
+    "verdict": "rejected",
+    "summary": "The whole-word issue-number match can be satisfied by incidental digits elsewhere in the tracker log (e.g. a '(1s)' timer or dot-count text), so a broken tracker that never actually prints issue numbers can still pass. That's a real falsifiability hole given the mock's low, single/double-digit issue numbers.",
+    "mustFix": [
+      {
+        "area": "Falsifiability",
+        "quote": "grep -qw \"$num\" \"$TRACKER_LOG\" && MATCHED_1=$((MATCHED_1 + 1))",
+        "problem": "Small numeric issue IDs (1-20) can collide as whole words with unrelated digits in the log, like a '(1s)' timestamp or a stray '4' from other output. A tracker that prints nothing real could still satisfy the count and pass."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "grep -Eq 'Polling\\.{1,3}([^.]|$)' \"$TRACKER_LOG\" || fail \"no 'Polling' status bar found in tracker output\"",
+        "problem": "This early check runs right after the same 4s sleep used for issue matching, so it doesn't add coverage beyond the later live-bar check. Not a blocker, but it's redundant plumbing that could be folded into the live check."
+      },
+      {
+        "area": "Coverage",
+        "quote": "head -n \"$LINES_AT_T1\" \"$TRACKER_LOG\" > \"$PREFIX_T1_FILE\"",
+        "problem": "If the implementation redraws the status bar in place using carriage returns rather than newlines, line-count-based snapshotting may not reliably capture the true prefix boundary. Worth a comment in the script for future maintainers."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "**what HTTP path the mock exposes for issues** GET /repos/{owner}/{repo}/issues",
+        "problem": "This is an enricher assumption never confirmed by the operator; it's reasonable but locks the mock's URL shape without man-made sign-off."
+      }
+    ],
+    "effectiveTokens": 38412,
+    "specSha": "6aa6dff76c42"
+  }
+}
