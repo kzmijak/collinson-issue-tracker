@@ -16,6 +16,11 @@ import { startProgress } from './progress.js';
 const PLANNER_DEFINITION = '.claude/agents/git.md';
 const TASK_BUDGET_TOKENS = 30_000;
 const DIFF_LIMIT = 60_000;
+/**
+ * Per file, before the overall limit: one run's diff was a single log full of terminal escapes,
+ * which used up the whole limit and left the planner seeing nothing else.
+ */
+const FILE_DIFF_LIMIT = 4_000;
 
 const TRAILER = [
   'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
@@ -33,9 +38,15 @@ function workingTree(): string {
   const status = git('status', '--short');
   if (!status.trim()) return '';
 
-  const diff = git('diff', 'HEAD');
-  const truncated =
-    diff.length > DIFF_LIMIT ? `${diff.slice(0, DIFF_LIMIT)}\n… diff truncated …` : diff;
+  const truncated = git('diff', 'HEAD')
+    .split(/(?=^diff --git )/m)
+    .map((file) =>
+      file.length > FILE_DIFF_LIMIT
+        ? `${file.slice(0, FILE_DIFF_LIMIT)}\n… ${file.length - FILE_DIFF_LIMIT} characters of this file omitted …\n`
+        : file,
+    )
+    .join('')
+    .slice(0, DIFF_LIMIT);
 
   return [
     '## git status --short',
