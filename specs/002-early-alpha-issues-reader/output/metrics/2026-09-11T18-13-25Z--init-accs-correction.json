@@ -1,0 +1,49 @@
+{
+  "at": "2026-09-11T18:13:25.725Z",
+  "durationMs": 50556,
+  "entry": "2026-09-10 — Init — accs correction",
+  "sourceSha": "c68a7f0f3949",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 75,
+    "outputTokens": 12363,
+    "cacheReadTokens": 34486,
+    "cacheCreationTokens": 11272
+  },
+  "effectiveTokens": 79159.8,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "fixedFrom": "rejected",
+  "verification": {
+    "at": "2026-09-11T18:14:18.182Z",
+    "verdict": "rejected",
+    "summary": "The mock-only hard gate is spelled out in the contract and behaviour table but accs.bash never actually tries to start the tracker with a bad or missing GITHUB_MODE, so an implementation that skips the gate would still pass.",
+    "mustFix": [
+      {
+        "area": "Coverage",
+        "quote": "| GITHUB_MODE unset or set to anything other than 'mock' | tracker exits non-zero immediately, no network calls made |",
+        "problem": "accs.bash always launches the tracker with GITHUB_MODE=mock explicitly and never exercises the unset/invalid case, so the single scariest requirement in this spec ('ONLY MOCK INSTANCES!') has zero enforcement check in the ACCS."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "bash \"$SPEC001\" &\nSPEC001_PID=$!\nwait \"$SPEC001_PID\"",
+        "problem": "accs.md says 'if it succeeds, terminate only the 001 script' but the script never kills anything after wait returns — it silently relies on spec 001's own trap-cleanup to have torn down its background mock/tracker, which isn't stated anywhere in this doc and will collide on port 4001 if that assumption is wrong."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "FIRST_ISSUE=$(echo \"$ISSUES_JSON\" | jq '[.[].number] | sort | .[0]')",
+        "problem": "FIRST_ISSUE is pinned from whatever loaded in the initial 60% burst, so it may not be issue #1 by any human-meaningful ordering — fine for the check, but worth knowing this isn't literally 'the first issue' in intake order."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 80670.2,
+    "specSha": "9d750ed297be"
+  }
+}

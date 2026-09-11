@@ -1,0 +1,8 @@
+- MAKE SURE THAT ONLY THE MOCK INSTANCES ARE BEING USED!
+- Run Spec 001 accs.bash. If it fails, terminate it and self. If succeeds, terminate only the 001 script.
+- Run the GitHub mock service. Ensure that there are Issues but all of them without any comments.
+- Run the Issues Tracker. 
+- Make a new comment "Hello World!" under the first Issue using curl. 
+- Ensure that 4 seconds have passed since the GitHub mock service spawn. 
+- First issue form the GitHub terminal should have 2 comments, the rest should have 1, it is acceptable that of the later entries have 0.
+- Other comments should say "I've been here!"
