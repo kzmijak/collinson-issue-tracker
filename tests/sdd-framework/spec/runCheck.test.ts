@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -45,5 +46,15 @@ describe('excerpt', () => {
     expect(result).toContain('FAIL: broken');
     expect(result).toContain('last line');
     expect(result).toContain('characters omitted');
+  });
+
+  it('collects what the check left running, even in a process group of its own', async () => {
+    const marker = `accs-stray-${process.pid}`;
+    await runCheck(script(`setsid sleep 60 >/dev/null 2>&1 & echo ${marker}; exit 1`), 5_000);
+
+    const alive = execFileSync('bash', ['-c', 'ps -eo cmd | grep -c "[s]leep 60" || true'], {
+      encoding: 'utf8',
+    });
+    expect(alive.trim()).toBe('0');
   });
 });
