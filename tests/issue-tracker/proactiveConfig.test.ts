@@ -5,8 +5,8 @@ describe('loadProactiveConfig', () => {
   it('falls back to the documented defaults', () => {
     const config = loadProactiveConfig({});
 
-    expect(config.baseUrl).toBe('http://localhost:4001');
-    expect(config.pollIntervalMs).toBe(1000);
+    expect(config.baseUrl).toBe('http://localhost:4000');
+    expect(config.pollIntervalMs).toBe(2000);
     expect(config.githubMode).toBe('');
   });
 

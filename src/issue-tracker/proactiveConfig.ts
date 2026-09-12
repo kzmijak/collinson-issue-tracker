@@ -5,12 +5,12 @@ export interface ProactiveConfig {
 }
 
 export function loadProactiveConfig(env: NodeJS.ProcessEnv = process.env): ProactiveConfig {
-  const port = Number(env.MOCK_GITHUB_PORT ?? 4001);
+  const port = Number(env.MOCK_GITHUB_PORT ?? 4123);
 
   return {
     githubMode: env.GITHUB_MODE ?? '',
-    baseUrl: `http://localhost:${port}`,
-    pollIntervalMs: Number(env.ISSUES_TRACKER_POLL_INTERVAL_MS ?? 1000),
+    baseUrl: env.MOCK_GITHUB_URL ?? `http://localhost:${port}`,
+    pollIntervalMs: Number(env.ISSUES_TRACKER_POLL_INTERVAL_MS ?? 2000),
   };
 }
 
