@@ -109,4 +109,37 @@ describe('VerifyPrompt', () => {
   it('asks nothing about a previous verdict when there is none', () => {
     expect(prompt.createMessage()).not.toContain('previous verdict');
   });
+
+  it('takes an approved verdict that spells its range of fire as null', () => {
+    const result = prompt.parseOutput(
+      JSON.stringify({
+        verdict: 'approved',
+        summary: 'fine',
+        mustFix: [],
+        shouldFix: [],
+        shouldKnow: [],
+        fix: null,
+      }),
+    );
+
+    expect(result.verdict).toBe('approved');
+    expect(result.fix).toBe('full');
+  });
+
+  it('falls back to an earlier block when the model corrects itself into a broken one', () => {
+    const good = JSON.stringify({
+      verdict: 'approved',
+      summary: 'fine',
+      mustFix: [],
+      shouldFix: [],
+      shouldKnow: [],
+      fix: 'accs',
+    });
+
+    const result = prompt.parseOutput(
+      `Here it is:\n\n\`\`\`json\n${good}\n\`\`\`\n\nWait, correcting:\n\n\`\`\`json\n{ "verdict": "approved" }\n\`\`\``,
+    );
+
+    expect(result.summary).toBe('fine');
+  });
 });
