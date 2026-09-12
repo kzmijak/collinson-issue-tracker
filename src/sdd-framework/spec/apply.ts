@@ -14,6 +14,7 @@ import { readKnowledgeBase } from './knowledgeBase.js';
 import { amendMetrics } from './metrics.js';
 import { readArtefacts } from './readArtefacts.js';
 import { runCheck, type CheckResult } from './runCheck.js';
+import { processIds, sweepStrays } from './strays.js';
 import { readStatus, setStatus, specSha } from './SpecFile.js';
 import { readPreviousFiles } from './specFiles.js';
 import { describeSpec, isStale, readSpecFolder } from './specFolder.js';
@@ -42,6 +43,8 @@ export interface ApplyProps {
   /** No new round starts after this; a round already running is never cut off, so its spend is still counted. */
   timeLimitMs: number;
   force: boolean;
+  /** Kills what the run leaves running in this repository. Off only for tests. */
+  sweepStrays?: boolean;
   /** What the acceptance check runs with — the same environment the implementer had. */
   checkEnv?: NodeJS.ProcessEnv;
   /** Reports as the run goes, so minutes of silence are not the only feedback available. */
@@ -91,6 +94,15 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
   }
 
   const stage = (label: string) => props.onActivity?.({ kind: 'stage', label });
+
+  // Anything running in this repository by the end that was not running at the start was started by
+  // this run — a server the implementer left listening outlives it and poisons the next check.
+  const pidsBefore = props.sweepStrays === false ? null : await processIds();
+  const sweep = async () => {
+    if (!pidsBefore) return;
+    const killed = await sweepStrays(pidsBefore, process.cwd());
+    if (killed > 0) stage(`swept ${killed} process${killed === 1 ? '' : 'es'} the run left behind`);
+  };
 
   stage('running the check to see whether there is anything to do');
   const before = await runCheck(script, props.checkTimeoutMs, props.checkEnv);
@@ -171,6 +183,7 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
 
     if (check.exitCode === 0) break;
   }
+  await sweep();
 
   const status = exhausted
     ? 'budget-exhausted'

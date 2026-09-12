@@ -58,6 +58,14 @@ function workingTree(): string {
   ].join('\n\n');
 }
 
+async function approved(): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question('\ncommit this plan? [y/N] ');
+  rl.close();
+
+  return /^y(es)?$/i.test(answer.trim());
+}
+
 function show(plan: CommitPlan): void {
   section(
     'Proposed commits',
@@ -145,6 +153,7 @@ async function link(files: string[], note: CommitNote): Promise<string[]> {
 }
 
 async function main(): Promise<number> {
+  const autoApprove = process.argv.slice(2).includes('--auto-approve');
   const state = workingTree();
 
   if (!state) {
@@ -170,11 +179,7 @@ async function main(): Promise<number> {
   );
   show(plan);
 
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await rl.question('\ncommit this plan? [y/N] ');
-  rl.close();
-
-  if (!/^y(es)?$/i.test(answer.trim())) {
+  if (!autoApprove && !(await approved())) {
     note('nothing committed — the working tree is untouched');
     return 1;
   }
