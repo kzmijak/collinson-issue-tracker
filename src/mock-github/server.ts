@@ -50,9 +50,10 @@ export function createMockGithubServer(
 
     if (req.method === 'GET' && ISSUES_PATH.test(url.pathname)) {
       const issues = dataset.getVisibleIssues().map((issue) => ({
-        ...issue,
+        id: issue.number,
+        title: issue.title,
+        content: issue.body,
         comments: comments.getComments(issue.number),
-        comments_count: comments.getCommentsCount(issue.number),
       }));
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(issues));
       return;

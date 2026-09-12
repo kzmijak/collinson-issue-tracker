@@ -35,9 +35,9 @@ export class ProactiveTracker {
       if (alreadyTouched(issue)) continue;
 
       try {
-        await this.deps.postComment(this.baseUrl, issue.number, MARKER_COMMENT, MARKER_AUTHOR);
+        await this.deps.postComment(this.baseUrl, issue.id, MARKER_COMMENT, MARKER_AUTHOR);
       } catch (error) {
-        this.deps.onError?.(issue.number, error);
+        this.deps.onError?.(issue.id, error);
       }
     }
   }

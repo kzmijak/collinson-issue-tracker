@@ -5,7 +5,7 @@ export interface MockComment {
 }
 
 export interface MockIssueSummary {
-  number: number;
+  id: number;
   title: string;
   comments: MockComment[];
 }
