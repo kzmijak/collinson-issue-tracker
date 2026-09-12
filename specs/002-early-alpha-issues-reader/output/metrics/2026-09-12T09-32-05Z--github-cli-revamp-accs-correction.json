@@ -54,6 +54,11 @@
       "at": "2026-09-12T09:33:45.660Z",
       "sha": "66e88af",
       "subject": "chore(reader): regenerate the enriched spec for the GitHub CLI revamp"
+    },
+    {
+      "at": "2026-09-12T09:33:45.734Z",
+      "sha": "1511a5c",
+      "subject": "chore(metrics): record the GitHub CLI revamp and testing-improvement runs"
     }
   ]
 }
