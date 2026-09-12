@@ -1,0 +1,60 @@
+{
+  "at": "2026-09-12T11:08:56.812Z",
+  "durationMs": 119949,
+  "entry": "2026-09-12 — GitHub Service Port",
+  "sourceSha": "304755a1ba25",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 13803,
+    "cacheReadTokens": 19722,
+    "cacheCreationTokens": 12726
+  },
+  "effectiveTokens": 173889.40000000002,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 2,
+    "assumptions": 5,
+    "decisions": 11,
+    "behaviours": 9,
+    "cases": 12,
+    "doneWhen": 6,
+    "outOfScope": 5,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T11:09:41.147Z",
+    "verdict": "rejected",
+    "summary": "Both prior must-fix items are properly resolved, but accs.bash never tests the buffer-cap/truncation behavior that spec.md's whole 'GitHub Cli Revamp' breakpoint is about, letting a broken truncation implementation pass silently.",
+    "mustFix": [
+      {
+        "area": "Coverage",
+        "quote": "export MOCK_GITHUB_BUFFER_CAP=500",
+        "problem": "accs.bash forces the cap to 500 for the entire run so truncation never has a chance to trigger, and no step anywhere checks the default cap (min(tty,200)/200 fallback) or the '...' truncation line. Spec.md dedicates a full breakpoint to this and 'Done when' lists 'line count never exceeds the active cap' as a requirement, yet nothing in the script verifies it, so a broken truncation implementation still passes."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "accs.bash invokes spec 001's frozen accs.bash then this spec's own steps, neither exporting MOCK_GITHUB_PORT",
+        "problem": "This Behaviour row claims accs.bash chains spec 001's frozen accs.bash, but the actual script never calls it - it starts pnpm mock-github directly. The doc and the implementation disagree, which will confuse whoever reads this spec next even though nothing here is strictly required by accs.md."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "MAKE SURE THAT ONLY THE MOCK INSTANCES ARE BEING USED!",
+        "problem": "accs.bash never checks env vars to confirm no real GitHub token/URL is configured - it just trusts pnpm mock-github and pnpm issues-tracker point at the mock by default. Reasonable given the contract, but it's an assumed guarantee rather than a verified one."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 80490,
+    "specSha": "8688ce72ad5b"
+  }
+}
