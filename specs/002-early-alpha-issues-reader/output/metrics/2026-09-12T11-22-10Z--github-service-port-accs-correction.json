@@ -92,6 +92,11 @@
       "at": "2026-09-12T13:17:15.160Z",
       "sha": "6dbe468",
       "subject": "chore(reader): regenerate ACCS script and enriched spec for repaint/port changes"
+    },
+    {
+      "at": "2026-09-12T13:18:44.868Z",
+      "sha": "98920f2",
+      "subject": "chore(metrics): append late-arriving enrich/verify/apply metrics for the issues-reader spec"
     }
   ]
 }

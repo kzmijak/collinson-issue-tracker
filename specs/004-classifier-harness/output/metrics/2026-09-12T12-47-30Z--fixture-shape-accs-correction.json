@@ -111,5 +111,12 @@
     },
     "model": "claude-sonnet-5",
     "specSha": "ab7f6ad82a90"
-  }
+  },
+  "commits": [
+    {
+      "at": "2026-09-12T13:18:44.921Z",
+      "sha": "6883095",
+      "subject": "spec(harness): specify the classifier harness"
+    }
+  ]
 }
