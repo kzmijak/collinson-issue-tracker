@@ -173,4 +173,8 @@ describe('pruneOrphans', () => {
 
     expect(statSync(join(dir, 'notes-by-hand.md')).isFile()).toBe(true);
   });
+
+  it('accepts the output-relative spelling the artefact labels invite', () => {
+    expect(normaliseGeneratedPath('specs/002-thing/output', 'output/accs.bash')).toBe('accs.bash');
+  });
 });

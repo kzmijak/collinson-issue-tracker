@@ -4,18 +4,21 @@ import { METRICS_DIR } from './metrics.js';
 import type { AccsFiles } from './schemas/Accs.js';
 
 export const ACCS_SCRIPT = 'accs.bash';
+export const OUTPUT_DIR = 'output';
 export const ENRICHED_SPEC = 'enriched-spec.md';
 
 export class SpecFileEscapeError extends Error {}
 
 /**
- * The prompt shows the model a repo-root path for the ACCS, so it answers with repo-root
- * paths. Accept either that or an output-relative one rather than rejecting a good result over a
- * convention the prompt itself blurred.
+ * The model is shown repo-root paths and files labelled `output/…`, so it answers with either, or
+ * with the bare name. All three mean the same file, and rejecting a good suite over which spelling
+ * came back has already cost one run.
  */
 export function normaliseGeneratedPath(specDir: string, candidate: string): string {
   const prefix = `${specDir.replace(/\/+$/, '')}/`;
-  return candidate.startsWith(prefix) ? candidate.slice(prefix.length) : candidate;
+  const inside = candidate.startsWith(prefix) ? candidate.slice(prefix.length) : candidate;
+
+  return inside.startsWith(`${OUTPUT_DIR}/`) ? inside.slice(OUTPUT_DIR.length + 1) : inside;
 }
 
 /**

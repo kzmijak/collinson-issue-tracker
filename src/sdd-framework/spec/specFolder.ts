@@ -2,10 +2,9 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { readOperatorSection, SpecFormatError, sourceSha } from './SpecFile.js';
-import { ACCS_SCRIPT, ENRICHED_SPEC } from './specFiles.js';
+import { ACCS_SCRIPT, ENRICHED_SPEC, OUTPUT_DIR } from './specFiles.js';
 
-export { ENRICHED_SPEC };
-export const OUTPUT_DIR = 'output';
+export { ENRICHED_SPEC, OUTPUT_DIR };
 export const ACCS_METHOD = 'accs.md';
 
 export interface SpecPaths {
