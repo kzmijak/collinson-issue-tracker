@@ -60,6 +60,9 @@ const DENIED = [
   'Bash(git stash:*)',
   'Edit(./specs/**)',
   'Write(./specs/**)',
+  // The same two paths spelled absolutely: one run wrote its own report into specs/ that way.
+  'Edit(/**/specs/**)',
+  'Write(/**/specs/**)',
   'Read(./.env)',
   'Bash(cat .env:*)',
 ];
