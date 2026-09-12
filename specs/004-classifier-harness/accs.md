@@ -1,0 +1,11 @@
+- The harness talks to no GitHub service at all, real or mock. It reads the fixtures file, calls the models, and writes its records. If the check finds it opening a GitHub connection, that is a failure.
+- The acceptance check is not allowed to run the full grid. It runs one config over two fixtures - the injection one and one ordinary one - so a check costs two model calls, not thirty six.
+- Point the harness at a temporary output directory of your own and remove it when you are done, even if the check fails halfway.
+- Run the harness that way and let it finish.
+- The run has to leave both records behind: the machine-readable one and the readable table.
+- The table has exactly one row per config that was run, with combined accuracy, priority accuracy, effort accuracy, failures, disqualified, total ET and total time. None of these may be blank.
+- Every accuracy is a number between 0 and 1. Total ET and total time are above zero. Failures is a whole number.
+- The machine-readable record has one entry per config-issue pair, and each entry carries the expected priority and effort, the returned priority and effort, and the penalty. The expected values must match fixtures/harness-issues.json.
+- Check the penalty arithmetic on one entry by hand: it has to equal 2^|expected priority - actual priority| + 2^|expected effort - actual effort| - 2.
+- Nothing was posted anywhere: no comment appears on the mock, and the repo's own .generated directory is untouched by the run.
+- Do not assert what the model actually answered. Whether a config classifies well is what the harness measures, not what the check decides.

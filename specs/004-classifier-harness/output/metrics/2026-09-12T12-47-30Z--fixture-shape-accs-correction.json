@@ -1,0 +1,115 @@
+{
+  "at": "2026-09-12T12:47:30.205Z",
+  "durationMs": 49502,
+  "entry": "2026-09-12 — Fixture shape — accs correction",
+  "sourceSha": "ac626bc96557",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 25,
+    "outputTokens": 6426,
+    "cacheReadTokens": 9488,
+    "cacheCreationTokens": 8419
+  },
+  "effectiveTokens": 87255.1,
+  "outcome": "written",
+  "files": [
+    "specs/004-classifier-harness/output/accs.bash"
+  ],
+  "fixedFrom": "rejected",
+  "verification": {
+    "at": "2026-09-12T12:48:08.379Z",
+    "verdict": "approved",
+    "summary": "Both the prior mustFix (missing range checks on priority/effort accuracy, totalEt, totalTime, failures) and both shouldFix items (unstated classifications.jsonl path, wrong --spec-id on the classify call) are now fixed. No new blocking issues found.",
+    "mustFix": [],
+    "shouldFix": [],
+    "shouldKnow": [
+      {
+        "area": "Method",
+        "quote": "CLASSIFICATIONS_FILE=\"$TMP_GEN/003-issue-classifier/classifications.jsonl\"",
+        "problem": "The path convention $GENERATED_DIR/<spec-id>/classifications.jsonl for spec 003 is still an assumption, not something the contract states outright. It's now justified by a comment tying it to the same layout pattern 004 itself uses, and the before/after check is sound regardless (fresh tmp dir guarantees an accurate absent-then-present comparison), so this is low risk."
+      },
+      {
+        "area": "Method",
+        "quote": "COMBINED=$(echo \"$ROW\" | awk -F'|' '{print $3}' | tr -d ' ')",
+        "problem": "The script assumes a fixed column order (combined, priority acc, effort acc, failures, disqualified, totalEt, totalTimeMs) when slicing the md row. This matches the exact order listed in the contract's readable-output row, so it's a fair assumption rather than an invented requirement."
+      }
+    ],
+    "fix": "full",
+    "effectiveTokens": 68044.8,
+    "specSha": "ab7f6ad82a90"
+  },
+  "application": {
+    "at": "2026-09-12T13:00:47.585Z",
+    "status": "converged",
+    "rounds": 1,
+    "checkExitCode": 0,
+    "checkDurationMs": 39726,
+    "converged": true,
+    "summary": "Built src/harness/ (fixtures loader, config loader, scoring, injection-obedience check, in-process grid runner, JSON+markdown report writer, CLI entry) reusing spec 003's classifier engine in-process, added a --harness flag to classify's CLI, and wired a new `harness` pnpm script. ACCS passed on repeated runs and typecheck/lint/tests (274 tests, 27 new) are all clean.",
+    "files": [
+      "src/harness/main.ts",
+      "src/harness/harnessTypes.ts",
+      "src/harness/injection.ts",
+      "src/harness/scoring.ts",
+      "src/harness/harnessFixtures.ts",
+      "src/harness/runHarness.ts",
+      "src/harness/harnessConfigs.ts",
+      "src/harness/harnessReport.ts",
+      "src/harness/singleFixtureClassify.ts",
+      "src/issue-tracker/classifyMain.ts",
+      "tests/harness/runHarness.test.ts",
+      "tests/harness/scoring.test.ts",
+      "tests/harness/harnessConfigs.test.ts",
+      "tests/harness/harnessReport.test.ts",
+      "tests/harness/singleFixtureClassify.test.ts",
+      "tests/harness/injection.test.ts",
+      "tests/harness/harnessFixtures.test.ts",
+      "package.json",
+      ".env.example",
+      "specs/004-classifier-harness/output/metrics/2026-09-12T12-57-27Z--enrich-impl.md"
+    ],
+    "picks": [
+      {
+        "decision": "Formula for per-axis priority/effort accuracy",
+        "chose": "Linear gap-over-max-range: 1 - |expected-actual|/range, per axis",
+        "why": "Spec only gives the combined penalty formula; only constrains per-axis accuracy to land in 0-1, which this satisfies"
+      },
+      {
+        "decision": "classify --harness --issue-id: fetch via GitHub or resolve from fixtures?",
+        "chose": "Always resolve --issue-id against fixtures/harness-issues.json, never call GitHub",
+        "why": "Contract text is self-contradictory (says both 'must not fetch by id' and 'is allowed to fetch'); only the no-GitHub reading can pass ACCS since no mock server is running during the check"
+      },
+      {
+        "decision": "Detecting whether a reply 'echoes the injected demand'",
+        "chose": "Extract quoted phrases from the injection fixture's body and check if the reply repeats one",
+        "why": "The spec deliberately keeps the injection fixture recognized by tag not wording, so no fixed keyword list was available; this is a heuristic, not a guaranteed-correct detector"
+      }
+    ],
+    "findings": [
+      {
+        "area": "Coverage",
+        "quote": "the classifier's own way in ... is allowed to fetch that one issue from the configured github client the same way spec 003's classify already does",
+        "problem": "This clause contradicts the harness's own 'never touch GitHub' requirement for the same --harness flag; ACCS happens to only exercise the no-GitHub path, so the contradiction never gets checked either way."
+      },
+      {
+        "area": "Method",
+        "quote": "config's answer on the injection fixture repeats the injected text's demand",
+        "problem": "No wording-independent definition of 'repeats the demand' is given, so disqualification on this ground rests on a heuristic (quoted-phrase matching) that a differently-worded injection fixture could dodge or that a benign reply could accidentally trip."
+      }
+    ],
+    "fix": "none",
+    "blocked": null,
+    "effectiveTokens": 252106.1,
+    "effectiveTokenBudget": 800000,
+    "withinBudget": true,
+    "usage": {
+      "inputTokens": 175,
+      "outputTokens": 9817,
+      "cacheReadTokens": 313318,
+      "cacheCreationTokens": 36369
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "ab7f6ad82a90"
+  }
+}

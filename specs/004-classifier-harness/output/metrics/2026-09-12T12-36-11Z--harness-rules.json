@@ -1,0 +1,59 @@
+{
+  "at": "2026-09-12T12:36:11.001Z",
+  "durationMs": 129087,
+  "entry": "2026-09-12 — Harness rules",
+  "sourceSha": "319f1dd9a9e4",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 75,
+    "outputTokens": 13535,
+    "cacheReadTokens": 33724,
+    "cacheCreationTokens": 10151
+  },
+  "effectiveTokens": 167622.3,
+  "outcome": "written",
+  "files": [
+    "specs/004-classifier-harness/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 1,
+    "assumptions": 2,
+    "decisions": 5,
+    "behaviours": 3,
+    "cases": 7,
+    "doneWhen": 3,
+    "outOfScope": 3,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T12:36:52.830Z",
+    "verdict": "rejected",
+    "summary": "The one requirement accs.md marks with a shouted warning - guaranteeing only the mock is ever reached - is implemented as a best-effort heuristic that silently no-ops when the mock isn't reachable, so a run against a live GitHub instance could still pass the check.",
+    "mustFix": [
+      {
+        "area": "Coverage",
+        "quote": "unset GITHUB_TOKEN GH_TOKEN GITHUB_ACCESS_TOKEN 2>/dev/null || true",
+        "problem": "This only removes a few guessed env var names as a deterrent; it never asserts the harness was actually pointed at the mock (no check of a mock base-URL config, no failure if the mock is down and the harness talked to something else). The one line in accs.md written in caps with an exclamation mark is left unenforced."
+      },
+      {
+        "area": "Coverage",
+        "quote": "else\n  echo \"NOTE: mock GitHub not reachable at $MOCK_GITHUB_URL, skipped comment-count guard\" >&2\nfi",
+        "problem": "When the mock isn't reachable, the 'nothing was posted anywhere' guard is skipped entirely instead of failing, so a broken or missing mock silently passes the exact check accs.md requires the ACCS to perform."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "COMMENTS_BEFORE_INJ=$(curl -sS \"$MOCK_GITHUB_URL/issues/$INJECTION_ID/comments\" 2>/dev/null | jq 'length' 2>/dev/null || echo \"unknown\")",
+        "problem": "If curl or jq fails mid-way this degrades to \"unknown\" and the before/after comparison is quietly skipped for that fixture, further softening the no-comment guarantee without surfacing it as a failure."
+      }
+    ],
+    "shouldKnow": [],
+    "fix": "accs",
+    "effectiveTokens": 77633.8,
+    "specSha": "496790ce0070"
+  }
+}

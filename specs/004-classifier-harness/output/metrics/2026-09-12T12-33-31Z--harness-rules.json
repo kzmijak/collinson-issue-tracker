@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-12T12:33:31.754Z",
+  "durationMs": 126124,
+  "entry": "2026-09-12 — Harness rules",
+  "sourceSha": "fda25804aa6c",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 75,
+    "outputTokens": 13161,
+    "cacheReadTokens": 33756,
+    "cacheCreationTokens": 11644
+  },
+  "effectiveTokens": 167621.2,
+  "outcome": "refused",
+  "detail": "refusing to write: accs.bash reference `src/`. The acceptance check drives the command the operator named, not the implementation behind it."
+}

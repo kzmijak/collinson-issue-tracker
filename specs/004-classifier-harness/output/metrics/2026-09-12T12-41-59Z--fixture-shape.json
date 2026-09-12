@@ -1,0 +1,101 @@
+{
+  "at": "2026-09-12T12:41:59.296Z",
+  "durationMs": 89322,
+  "entry": "2026-09-12 — Fixture shape",
+  "sourceSha": "ac626bc96557",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 100,
+    "outputTokens": 10216,
+    "cacheReadTokens": 50946,
+    "cacheCreationTokens": 14121
+  },
+  "effectiveTokens": 147851.7,
+  "outcome": "written",
+  "files": [
+    "specs/004-classifier-harness/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 1,
+    "assumptions": 1,
+    "decisions": 6,
+    "behaviours": 3,
+    "cases": 7,
+    "doneWhen": 3,
+    "outOfScope": 3,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T12:46:24.570Z",
+    "verdict": "rejected",
+    "summary": "The previous path bug is fixed, but accs.bash only checks the combined-accuracy column against accs.md's numeric rules and silently skips the rest — priority accuracy, effort accuracy, total ET, total time, and failures-as-integer are never validated.",
+    "mustFix": [
+      {
+        "area": "Coverage",
+        "quote": "Every accuracy is a number between 0 and 1. Total ET and total time are above zero. Failures is a whole number.",
+        "problem": "accs.bash only range-checks the combined accuracy column ($3) and never touches priority accuracy, effort accuracy, totalEt, totalTimeMs or failures. A broken implementation that reports totalEt=0, a negative time, or a non-integer failures count would still pass."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "CLASSIFICATIONS_FILE=\"$TMP_GEN/$SPEC_ID/../003-issue-classifier/classifications.jsonl\"",
+        "problem": "This assumes spec 003 writes to $GENERATED_DIR/003-issue-classifier/classifications.jsonl, a path convention never stated anywhere in this spec or its contract. If the real layout differs the before/after hashes both stay empty and the check silently passes without ever comparing anything."
+      },
+      {
+        "area": "Method",
+        "quote": "CLASSIFY_OUT=$(pnpm classify --spec-id \"$SPEC_ID\" --issue-id \"$ISSUE_FOR_CLASSIFY\" --harness 2>&1)",
+        "problem": "Passing 004-classifier-harness as the classify command's --spec-id is unexplained by the contract; if --spec-id is meant to route to the issue's owning spec this call may target the wrong context."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Coverage",
+        "quote": "The harness talks to no GitHub service at all, real or mock.",
+        "problem": "Nothing in accs.bash actively verifies absence of a GitHub connection (no mock service is even started); this rests entirely on the implementation's own restraint rather than being independently checked."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 72759.8,
+    "specSha": "8d84712ecab1"
+  },
+  "application": {
+    "at": "2026-09-12T12:44:12.226Z",
+    "status": "blocked",
+    "rounds": 1,
+    "checkExitCode": 1,
+    "checkDurationMs": 9,
+    "converged": false,
+    "summary": "Blocked before writing any code: output/accs.bash looks for fixtures/configs at specs/004-classifier-harness/{fixtures,configs}/, but the man-made fixtures/harness-issues.json already lives at the repo root (matching the enriched spec's own Contract/Exports tables), and configs/harness-default-configs.json doesn't exist anywhere yet. Running the ACCS as-is fails on its very first guard, so nothing in src/harness was ever exercised.",
+    "files": [],
+    "picks": [],
+    "findings": [
+      {
+        "area": "Coverage",
+        "quote": "FIXTURES=\"$REPO_ROOT/specs/$SPEC_ID/fixtures/harness-issues.json\"",
+        "problem": "This path can never resolve: the enriched spec's own Contract and Exports tables both name the file as plain fixtures/harness-issues.json (repo root), which is exactly where the file already sits. The ACCS disagrees with its own spec about where its required input lives and fails before calling the harness at all."
+      },
+      {
+        "area": "Coverage",
+        "quote": "CONFIGS=\"$REPO_ROOT/specs/$SPEC_ID/configs/harness-default-configs.json\"",
+        "problem": "Same mismatch for the default config set — the Exports table names it configs/harness-default-configs.json (repo root), but the ACCS looks under specs/$SPEC_ID/configs/, and neither location currently has the file."
+      }
+    ],
+    "fix": "accs",
+    "blocked": "output/accs.bash's FIXTURES/CONFIGS path variables conflict with the enriched spec's own Contract/Exports tables (repo-root fixtures/ and configs/ vs. specs/004-classifier-harness/fixtures and .../configs), and I can't write into specs/004-classifier-harness/ to reconcile it myself since that's outside my declared write boundary.",
+    "effectiveTokens": 245257.2,
+    "effectiveTokenBudget": 800000,
+    "withinBudget": true,
+    "usage": {
+      "inputTokens": 275,
+      "outputTokens": 8177,
+      "cacheReadTokens": 504186,
+      "cacheCreationTokens": 24840
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "75887794649b"
+  }
+}
