@@ -18,3 +18,27 @@ Proactive Issues Tracker
 - Next to each entry, GitHub Service Terminal should display number of comments related to the issue
 - GitHub Service Terminal should log each time a new comment gets added.
 - GitHub console should fully reload and always paint the current state fully.
+
+### 2026-09-10 — Mock GitHub Improvements
+
+Mock GitHub:
+- After each update, the console is completely cleared and the new complete state is rendered.
+
+Example of a single Issue entry print (desired format, unrealistic example)
+[...]
+
+Issues #12: (3)
+Title: This is a sample issue
+Content: Something bad has happened and I need some help
+Comments:
+  - [JohnDoe] 
+    Well that sucks
+  
+  - [BenDover13]
+    I hope all is well
+
+  - [GitHub Issues Tracker]
+    I've been here!
+
+[...]
+Repeat for all other issues
