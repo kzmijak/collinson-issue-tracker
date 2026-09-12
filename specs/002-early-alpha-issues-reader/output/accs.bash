@@ -1,118 +1,217 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# ACCS for spec 002 - Proactive Issues Tracker + stateful mock GitHub
-# Exit 0 => world matches spec. Exit 1 => it doesn't (or script itself is invalid).
+MOCK_PORT="${MOCK_GITHUB_PORT:-4000}"
+MOCK_URL="http://localhost:${MOCK_PORT}"
+OUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG="$OUT_DIR/mock-github.log"
+TRACKER_LOG="$OUT_DIR/issues-tracker.log"
+MOCK_PID=""
+TRACKER_PID=""
 
-cd "$(dirname "$0")/../../.." || exit 1
-REPO_ROOT="$(pwd)"
-
-[ -f .env ] && set -a && source .env && set +a
-MOCK_GITHUB_PORT="${MOCK_GITHUB_PORT:-4000}"
-BASE_URL="http://localhost:${MOCK_GITHUB_PORT}"
-
-# Guard: only ever talk to our own local mock, never a real host.
-case "$BASE_URL" in
-  http://localhost:*|http://127.0.0.1:*) ;;
-  *) echo "REFUSING: BASE_URL ($BASE_URL) is not local, aborting to avoid touching real GitHub"; exit 1 ;;
-esac
-
-PIDS=()
 cleanup() {
-  for pid in "${PIDS[@]:-}"; do
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null
-  done
-  wait 2>/dev/null
+  [ -n "$TRACKER_PID" ] && kill "$TRACKER_PID" 2>/dev/null
+  [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null
 }
 trap cleanup EXIT
 
-fail() { echo "FAIL: $1"; exit 1; }
+fail() { echo "ACCS FAIL: $1"; exit 1; }
 
-# --- Step 1: gate on spec 001's accs.bash ---
-ONE_ACCS=$(ls specs/001-*/output/accs.bash 2>/dev/null | head -n1)
-[ -z "$ONE_ACCS" ] && fail "could not locate spec 001's accs.bash"
+issues_json() { curl -sf "$MOCK_URL/issues"; }
 
-echo "Running 001 gate: $ONE_ACCS"
-bash "$ONE_ACCS"
-ONE_EXIT=$?
-if [ "$ONE_EXIT" -ne 0 ]; then
-  fail "spec 001 accs.bash failed (exit $ONE_EXIT) - terminating self per accs.md"
-fi
-echo "001 gate passed, tearing down anything it left on ${MOCK_GITHUB_PORT}"
-fuser -k "${MOCK_GITHUB_PORT}"/tcp 2>/dev/null
-sleep 1
+count_issues() { printf '%s' "$1" | node -e "let d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.length)"; }
+any_has_comments() { printf '%s' "$1" | node -e "let d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d.some(i=>i.comments.length>0)?'yes':'no')"; }
+first_issue_id() { printf '%s' "$1" | node -e "let d=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(d[0].id)"; }
+comments_of() { printf '%s' "$1" | node -e "let d=JSON.parse(require('fs').readFileSync(0,'utf8'));let i=d.find(x=>String(x.id)==='$2');console.log(i?JSON.stringify(i.comments):'null')"; }
+check_touch() {
+  printf '%s' "$1" | node -e "
+let d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+let bad=d.filter(i=>{let touched=i.comments.filter(c=>c.author==='GitHub Issues Tracker'&&c.body==='I\'ve been here!');return touched.length>1;});
+if(bad.length) { console.log('MULTI_TOUCH:'+bad.map(b=>b.id).join(',')); process.exit(1); }
+console.log('ok');
+"
+}
 
-# --- Step 2: start our own fresh mock GitHub ---
-pnpm mock-github > /tmp/002-mock-github.log 2>&1 &
-MOCK_PID=$!
-PIDS+=("$MOCK_PID")
-SPAWN_TS=$(date +%s.%N)
+# Scans every SNAPSHOT block: fails on dup ids, on total lines exceeding the
+# active cap, and on a block flagged truncated whose last printed line isn't
+# exactly "...". Prints one summary line per block.
+scan_snapshots() {
+  node -e "
+const fs=require('fs');
+const CAP=Number(process.env.MOCK_GITHUB_BUFFER_CAP||200);
+const text=fs.readFileSync('$LOG','utf8');
+const lines=text.split('\n');
+let blocks=[]; let cur=null;
+for(const line of lines){
+  const m=line.match(/^===SNAPSHOT (\d+) /);
+  if(m){ if(cur) blocks.push(cur); cur={n:Number(m[1]), ids:[], lines:1, truncated:false, lastLine:''}; continue; }
+  if(!cur) continue;
+  const im=line.match(/^Issues #(\d+): \(/);
+  if(im){ cur.ids.push(im[1]); cur.lines++; cur.lastLine=line; }
+  else if(line.trim()!=='') { cur.lines++; cur.lastLine=line; if(line.trim()==='...') cur.truncated=true; }
+}
+if(cur) blocks.push(cur);
+for(const b of blocks){
+  const seen=new Set();
+  for(const id of b.ids){
+    if(seen.has(id)){ console.error('DUPLICATE issue #'+id+' in snapshot '+b.n); process.exit(2); }
+    seen.add(id);
+  }
+  if(b.truncated && b.lastLine.trim()!=='...'){ console.error('snapshot '+b.n+' flagged truncated but last line is not \"...\"'); process.exit(3); }
+  if(b.lines > CAP){ console.error('snapshot '+b.n+' has '+b.lines+' lines, exceeds cap '+CAP); process.exit(4); }
+}
+for(const b of blocks) console.log('n='+b.n+' ids='+b.ids.length+' lines='+b.lines+' trunc='+b.truncated);
+"
+}
 
-READY=0
-for i in $(seq 1 50); do
-  if curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/issues" | grep -q '^200$'; then
-    READY=1; break
+assert_no_dupes() {
+  scan_snapshots > "$OUT_DIR/.snapshot_scan.txt"
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    cat "$OUT_DIR/.snapshot_scan.txt" 2>/dev/null
+    fail "snapshot integrity check failed (duplicate id, cap overflow, or bad truncation marker)"
   fi
-  sleep 0.2
+}
+
+assert_comment_logged() {
+  local id="$1" author="$2" tries=0
+  while [ $tries -lt 20 ]; do
+    grep -F "[comment] issue #${id} +1 from ${author}" "$LOG" > /dev/null 2>&1 && return 0
+    sleep 0.1
+    tries=$((tries+1))
+  done
+  fail "mock-github.log never printed '[comment] issue #${id} +1 from ${author}' after the POST"
+}
+
+# ============================================================
+# 0. Force mock-only mode
+# ============================================================
+unset GITHUB_TOKEN GH_TOKEN
+export MOCK_GITHUB_PORT="$MOCK_PORT"
+export MOCK_GITHUB_URL="$MOCK_URL"
+export MOCK_GITHUB_BUFFER_CAP=500
+export ISSUES_TRACKER_POLL_INTERVAL_MS="${ISSUES_TRACKER_POLL_INTERVAL_MS:-2000}"
+
+# ============================================================
+# 1. Spec 001 smoke test first
+# ============================================================
+SPEC001_DIR=$(find "$OUT_DIR/../../" -maxdepth 1 -type d -name '001-*' | head -n1)
+[ -n "$SPEC001_DIR" ] || fail "could not locate spec 001 directory"
+SPEC001_ACCS="$SPEC001_DIR/output/accs.bash"
+[ -f "$SPEC001_ACCS" ] || fail "spec 001 accs.bash not found at $SPEC001_ACCS"
+bash "$SPEC001_ACCS"
+[ $? -eq 0 ] || fail "spec 001 accs.bash failed - terminating"
+
+# ============================================================
+# 2. Boot mock GitHub
+# ============================================================
+: > "$LOG"
+pnpm mock-github > "$LOG" 2>&1 &
+MOCK_PID=$!
+SPAWN_TS=$(date +%s)
+
+for i in $(seq 1 30); do
+  curl -sf "$MOCK_URL/issues" > /dev/null 2>&1 && break
+  sleep 0.3
 done
-[ "$READY" -ne 1 ] && fail "mock GitHub never became healthy on $BASE_URL"
+curl -sf "$MOCK_URL/issues" > /dev/null 2>&1 || fail "mock-github never became reachable on $MOCK_URL"
 
-ISSUES_JSON=$(curl -s "$BASE_URL/issues")
-NONZERO=$(echo "$ISSUES_JSON" | jq '[.[] | select((.comments // []) | length > 0)] | length')
-[ "$NONZERO" -ne 0 ] && fail "mock GitHub started with $NONZERO issue(s) already carrying comments, expected zero"
-COUNT=$(echo "$ISSUES_JSON" | jq 'length')
-[ "$COUNT" -lt 1 ] && fail "mock GitHub reports zero issues, nothing to track"
+# ============================================================
+# 3. Fresh issues, no comments yet
+# ============================================================
+ISSUES_A=$(issues_json)
+COUNT_A=$(count_issues "$ISSUES_A")
+[ "$COUNT_A" -gt 0 ] || fail "no issues loaded at startup"
+[ "$(any_has_comments "$ISSUES_A")" = "no" ] || fail "issues already have comments before any mutation"
+assert_no_dupes
 
-# --- Step 3: start the tracker ---
-pnpm issues-tracker > /tmp/002-tracker.log 2>&1 &
-TRACKER_PID=$!
-PIDS+=("$TRACKER_PID")
+# ============================================================
+# 4. Wait to 4s since spawn, expect growth
+# ============================================================
+NOW=$(date +%s)
+ELAPSED=$((NOW - SPAWN_TS))
+REMAIN=$((4 - ELAPSED))
+[ $REMAIN -gt 0 ] && sleep "$REMAIN"
 
-# --- Step 4: curl a manual comment onto the first issue ---
-FIRST_NUMBER=$(echo "$ISSUES_JSON" | jq '[.[].number] | min')
-[ -z "$FIRST_NUMBER" ] || [ "$FIRST_NUMBER" = "null" ] && fail "could not determine first issue number"
+ISSUES_B=$(issues_json)
+COUNT_B=$(count_issues "$ISSUES_B")
+[ "$COUNT_B" -gt "$COUNT_A" ] || fail "expected more issues after 4s (before=$COUNT_A after=$COUNT_B)"
+assert_no_dupes
 
-CURL_CODE=$(curl -s -o /tmp/002-curl-comment.json -w '%{http_code}' \
-  -X POST "$BASE_URL/issues/${FIRST_NUMBER}/comments" \
+# ============================================================
+# 5. Comment on the first issue via curl
+# ============================================================
+FIRST_ID=$(first_issue_id "$ISSUES_B")
+curl -sf -X POST "$MOCK_URL/issues/$FIRST_ID/comments" \
   -H 'Content-Type: application/json' \
-  -d '{"body":"Hello World!"}')
-[ "$CURL_CODE" != "201" ] && fail "curl comment on issue #$FIRST_NUMBER returned $CURL_CODE, expected 201"
+  -d '{"author":"QA","body":"Hello World!"}' > /dev/null \
+  || fail "POST comment to issue #$FIRST_ID failed"
 
-# --- Step 5: wait until 4s have passed since mock spawn ---
-NOW_TS=$(date +%s.%N)
-ELAPSED=$(echo "$NOW_TS - $SPAWN_TS" | bc)
-REMAINING=$(echo "4 - $ELAPSED" | bc)
-if (( $(echo "$REMAINING > 0" | bc -l) )); then
-  sleep "$REMAINING"
-fi
+assert_comment_logged "$FIRST_ID" "QA"
 
-# --- Step 6: assert final state ---
-FINAL_JSON=$(curl -s "$BASE_URL/issues")
+sleep 0.5
+ISSUES_C=$(issues_json)
+FIRST_COMMENTS=$(comments_of "$ISSUES_C" "$FIRST_ID")
+FIRST_COUNT=$(printf '%s' "$FIRST_COMMENTS" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).length)")
+[ "$FIRST_COUNT" -eq 1 ] || fail "issue #$FIRST_ID should have exactly 1 comment after manual post, has $FIRST_COUNT"
+assert_no_dupes
 
-FIRST_COMMENTS=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_NUMBER" '[.[] | select(.number == $n)][0].comments // []')
-FIRST_COUNT=$(echo "$FIRST_COMMENTS" | jq 'length')
-[ "$FIRST_COUNT" -ne 2 ] && fail "first issue #$FIRST_NUMBER has $FIRST_COUNT comment(s), expected exactly 2"
+# ============================================================
+# 6. Run the Issues Tracker once, sweep all issues
+# ============================================================
+pnpm issues-tracker > "$TRACKER_LOG" 2>&1 &
+TRACKER_PID=$!
+sleep "$(( (ISSUES_TRACKER_POLL_INTERVAL_MS/1000) * 3 + 2 ))"
+kill "$TRACKER_PID" 2>/dev/null
+TRACKER_PID=""
 
-HAS_HELLO=$(echo "$FIRST_COMMENTS" | jq '[.[] | select(.body == "Hello World!")] | length')
-HAS_TRACKER=$(echo "$FIRST_COMMENTS" | jq '[.[] | select(.author == "GitHub Issues Tracker" and .body == "I'"'"'ve been here!")] | length')
-[ "$HAS_HELLO" -ne 1 ] && fail "first issue is missing the curl'd 'Hello World!' comment"
-[ "$HAS_TRACKER" -ne 1 ] && fail "first issue is missing the tracker's 'I've been here!' comment"
+# ============================================================
+# 7. Verify comment counts AND full coverage
+# ============================================================
+ISSUES_D=$(issues_json)
+FIRST_FINAL=$(comments_of "$ISSUES_D" "$FIRST_ID")
+FIRST_FINAL_COUNT=$(printf '%s' "$FIRST_FINAL" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).length)")
+[ "$FIRST_FINAL_COUNT" -eq 2 ] || fail "issue #$FIRST_ID expected 2 comments after tracker run, got $FIRST_FINAL_COUNT"
 
-BAD_ISSUES=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_NUMBER" '
-  [.[] | select(.number != $n)] | map({
-    number: .number,
-    count: ((.comments // []) | length),
-    onlyTracker: ((.comments // []) | all(.author == "GitHub Issues Tracker" and .body == "I'"'"'ve been here!"))
-  }) | map(select((.count != 0 and .count != 1) or (.count == 1 and .onlyTracker == false)))
-')
-BAD_COUNT=$(echo "$BAD_ISSUES" | jq 'length')
-if [ "$BAD_COUNT" -ne 0 ]; then
-  echo "Offending issues: $BAD_ISSUES"
-  fail "$BAD_COUNT other issue(s) don't match the '0 or exactly-1-tracker-comment' rule"
-fi
+assert_comment_logged "$FIRST_ID" "GitHub Issues Tracker"
 
-AT_LEAST_ONE_TOUCHED=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_NUMBER" '[.[] | select(.number != $n and ((.comments // []) | length) == 1)] | length')
-[ "$AT_LEAST_ONE_TOUCHED" -lt 1 ] && fail "no other issue got the tracker's comment - tracker may not be running"
+printf '%s' "$ISSUES_D" | node -e "
+let d=JSON.parse(require('fs').readFileSync(0,'utf8'));
+for(const i of d){
+  const tracker=i.comments.filter(c=>c.author==='GitHub Issues Tracker');
+  if(tracker.length>1){ console.error('issue #'+i.id+' touched more than once'); process.exit(1); }
+  if(tracker.length===1 && tracker[0].body!==\"I've been here!\"){ console.error('issue #'+i.id+' tracker comment has wrong body'); process.exit(1); }
+}
+console.log('ok');
+" || fail "tracker comment integrity check failed"
 
-echo "PASS: mock GitHub + proactive tracker behave as specced"
+check_touch "$ISSUES_D" > /dev/null || fail "an issue was touched by the tracker more than once"
+
+# --- coverage: every issue that existed BEFORE the tracker ran (snapshot C,
+# taken right after the manual curl comment, pre-tracker) must now carry
+# exactly one tracker comment. Only issues loaded AFTER that point (late
+# arrivals, not in ISSUES_C) are allowed to have zero. This is what catches a
+# tracker that only touches the first issue and does nothing for the rest. ---
+printf '%s' "$ISSUES_C" > "$OUT_DIR/.pre_tracker.json"
+printf '%s' "$ISSUES_D" > "$OUT_DIR/.post_tracker.json"
+node -e "
+const fs=require('fs');
+let pre=JSON.parse(fs.readFileSync('$OUT_DIR/.pre_tracker.json','utf8'));
+let post=JSON.parse(fs.readFileSync('$OUT_DIR/.post_tracker.json','utf8'));
+let preIds=new Set(pre.map(i=>String(i.id)));
+let missing=[];
+for(const i of post){
+  const t=i.comments.filter(c=>c.author==='GitHub Issues Tracker'&&c.body===\"I've been here!\").length;
+  if(preIds.has(String(i.id)) && t!==1) missing.push(i.id);
+}
+if(missing.length){ console.error('issues present before tracker run but never touched: '+missing.join(',')); process.exit(1); }
+console.log('coverage ok: '+preIds.size+' pre-existing issues all carry exactly one tracker comment');
+" || fail "tracker skipped one or more issues that existed before it ran (coverage check failed)"
+
+# ============================================================
+# 8. Final duplicate/cap/truncation sanity sweep
+# ============================================================
+assert_no_dupes
+
+echo "ACCS PASS: mock-github + issues-tracker behave per spec 002"
 exit 0
