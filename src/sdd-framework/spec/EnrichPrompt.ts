@@ -46,6 +46,8 @@ export class EnrichPrompt extends JsonPrompt<Enrichment> {
     private readonly accs: string,
     private readonly mode: EnrichMode = 'default',
     private readonly feedback?: Feedback,
+    /** What the approved specs around this one have already settled. */
+    private readonly exports = '',
   ) {
     super();
   }
@@ -63,6 +65,17 @@ export class EnrichPrompt extends JsonPrompt<Enrichment> {
       '## accs.md',
       '',
       this.accs,
+      ...(this.exports
+        ? [
+            '',
+            '## Already in force',
+            '',
+            'Exported by the approved specs around this one. Honour them, or say in your decisions',
+            'which one you are replacing and why.',
+            '',
+            this.exports,
+          ]
+        : []),
     ].join('\n');
   }
 

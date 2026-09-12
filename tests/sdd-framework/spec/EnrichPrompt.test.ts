@@ -56,4 +56,23 @@ describe('EnrichPrompt', () => {
     expect(message).toContain('## accs.md');
     expect(message).toContain('Start it and curl it.');
   });
+
+  it('carries what the approved specs around it have already settled', () => {
+    const message = new EnrichPrompt(
+      '## What I want\n\n### 2026-09-12 — x\n\nprose',
+      'check it somehow',
+      'default',
+      undefined,
+      '### 001-reader\n\n| mock port | MOCK_GITHUB_PORT | the check needs it |',
+    ).createMessage();
+
+    expect(message).toContain('## Already in force');
+    expect(message).toContain('MOCK_GITHUB_PORT');
+  });
+
+  it('says nothing about other specs when none of them exported anything', () => {
+    expect(
+      new EnrichPrompt('## What I want\n\n### 2026-09-12 — x\n\nprose', 'check').createMessage(),
+    ).not.toContain('Already in force');
+  });
 });

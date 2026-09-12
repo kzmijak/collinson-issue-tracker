@@ -4,6 +4,7 @@ import { renderSpec } from '../../../src/sdd-framework/spec/renderSpec.js';
 
 const body: EnrichedBody = {
   summary: 'Polls a repository and logs its issues.',
+  exports: [{ name: 'mock port', value: 'MOCK_GITHUB_PORT=4000', why: 'the check needs it' }],
   drawbacks: ['polling wastes requests when nothing changed'],
   contract: [
     { facade: '`pnpm start` prints `#<n> <title>` per issue', promise: 'one line per open issue' },

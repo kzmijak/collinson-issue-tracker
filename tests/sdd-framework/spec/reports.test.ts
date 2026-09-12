@@ -20,6 +20,7 @@ const run = {
 
 const spec: EnrichedBody = {
   summary: 'Polls a repository.',
+  exports: [{ name: 'mock port', value: 'MOCK_GITHUB_PORT=4000', why: 'the check needs it' }],
   contract: [{ facade: '`pnpm start` prints `#<n> <title>`', promise: 'one line per issue' }],
   numbers: 'interval - 1000 ms',
   notThis: 'webhooks',

@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import type { Llm, TokenUsage } from '../llm/Llm.js';
 import type { EnrichedBody } from './schemas/Enrichment.js';
 import { latestMetricsPath, writeMetrics, type EnrichMetrics, type Outcome } from './metrics.js';
@@ -6,6 +7,7 @@ import { AccsPrompt } from './AccsPrompt.js';
 import { EnrichPrompt, type EnrichMode, type Feedback } from './EnrichPrompt.js';
 import { renderSpec } from './renderSpec.js';
 import { readEntries, readSectionItems, readStatus } from './SpecFile.js';
+import { readExports } from './exports.js';
 import { readSpecFolder, specPaths, withoutMeta } from './specFolder.js';
 import { pruneOrphans, readPreviousFiles, writeGeneratedFiles } from './specFiles.js';
 import { enrichReport, latestReport, writeReport, type ReportRun } from './reports.js';
@@ -122,9 +124,11 @@ export async function enrich(
       };
     }
 
+    const inForce = await readExports(dirname(paths.dir), paths.dir);
+
     calling = 'enricher';
     const enrichment = await enricher.prompt(
-      new EnrichPrompt(folder.operatorSection, folder.accs, mode, feedback),
+      new EnrichPrompt(folder.operatorSection, folder.accs, mode, feedback, inForce),
       { fresh: true },
     );
     settle();

@@ -23,6 +23,18 @@ export const enrichedBodySchema = z.object({
     .describe(
       'every facade the ACCS may rely on — the only things it may assume about the implementation',
     ),
+  exports: z
+    .array(
+      z.object({
+        name: z.string().min(1).describe('what it is, two or three words'),
+        value: z.string().min(1).describe('the literal name, port, path or format'),
+        why: z.string().min(1).describe('one sentence'),
+      }),
+    )
+    .default([])
+    .describe(
+      'decisions later specs have to honour, observable from outside only: environment variables, ports, endpoints, command names, line formats',
+    ),
   numbers: z
     .string()
     .min(1)

@@ -27,6 +27,7 @@ export function renderSpec(body: EnrichedBody, meta: SpecMeta): string {
     '| ------ | ------- |',
     ...body.contract.map(({ facade, promise }) => `| ${facade} | ${promise} |`),
     '',
+    renderExports(body.exports),
     renderOpenQuestions(body.openQuestions),
     renderAssumptions(body.assumptions),
     '## Done when',
@@ -67,6 +68,24 @@ function renderRows(body: EnrichedBody): string {
     `| **Check**    | \`bash output/${ACCS_SCRIPT}\` |`,
     `| **Numbers**  | ${body.numbers} |`,
     `| **Not this** | ${body.notThis} |`,
+    '',
+  ].join('\n');
+}
+
+/** Read by the enrichment of every later spec, which is why it is a section and not a decision. */
+export const EXPORTS_HEADING = '## Exports';
+
+function renderExports(exports: EnrichedBody['exports']): string {
+  if (exports.length === 0) return '';
+
+  return [
+    EXPORTS_HEADING,
+    '',
+    'What later specs have to honour. Changing any of these breaks the specs that rely on them.',
+    '',
+    '| name | value | why |',
+    '| ---- | ----- | --- |',
+    ...exports.map(({ name, value, why }) => `| ${name} | ${value} | ${why} |`),
     '',
   ].join('\n');
 }
