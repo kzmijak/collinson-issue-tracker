@@ -9,7 +9,7 @@ export function loadProactiveConfig(env: NodeJS.ProcessEnv = process.env): Proac
 
   return {
     githubMode: env.GITHUB_MODE ?? '',
-    baseUrl: env.MOCK_GITHUB_URL ?? `http://localhost:${port}`,
+    baseUrl: env.MOCK_GITHUB_URL || `http://localhost:${port}`,
     pollIntervalMs: Number(env.ISSUES_TRACKER_POLL_INTERVAL_MS ?? 2000),
   };
 }

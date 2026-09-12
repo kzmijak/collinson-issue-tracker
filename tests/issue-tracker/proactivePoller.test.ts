@@ -7,7 +7,7 @@ import {
 import type { MockComment, MockIssueSummary } from '../../src/issue-tracker/mockGithubClient.js';
 
 function issue(id: number, comments: MockComment[] = []): MockIssueSummary {
-  return { id, title: `Issue ${id}`, comments };
+  return { id, title: `Issue ${id}`, content: `Body for issue ${id}`, comments };
 }
 
 function humanComment(body: string): MockComment {

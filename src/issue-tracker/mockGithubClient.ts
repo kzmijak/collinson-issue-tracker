@@ -7,6 +7,7 @@ export interface MockComment {
 export interface MockIssueSummary {
   id: number;
   title: string;
+  content: string;
   comments: MockComment[];
 }
 

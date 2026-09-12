@@ -5,9 +5,15 @@ describe('loadProactiveConfig', () => {
   it('falls back to the documented defaults', () => {
     const config = loadProactiveConfig({});
 
-    expect(config.baseUrl).toBe('http://localhost:4000');
+    expect(config.baseUrl).toBe('http://localhost:4123');
     expect(config.pollIntervalMs).toBe(2000);
     expect(config.githubMode).toBe('');
+  });
+
+  it('falls back to the port-derived URL when MOCK_GITHUB_URL is set but blank', () => {
+    const config = loadProactiveConfig({ MOCK_GITHUB_URL: '', MOCK_GITHUB_PORT: '4123' });
+
+    expect(config.baseUrl).toBe('http://localhost:4123');
   });
 
   it('reads every value from the environment when present', () => {
