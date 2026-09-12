@@ -1,6 +1,0 @@
-
-> collinson-issue-tracker@0.1.0 mock-github /home/kacper/repos/collinson-issue-tracker
-> tsx src/mock-github/main.ts
-
-mock-github: listening on http://localhost:4123
- ELIFECYCLE  Command failed.
