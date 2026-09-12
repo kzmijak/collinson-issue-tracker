@@ -1,0 +1,84 @@
+{
+  "at": "2026-09-12T12:00:52.545Z",
+  "durationMs": 114119,
+  "entry": "2026-09-12 — Mock surface and LLM config",
+  "sourceSha": "71617643581e",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 13806,
+    "cacheReadTokens": 19722,
+    "cacheCreationTokens": 10592
+  },
+  "effectiveTokens": 168584.40000000002,
+  "outcome": "written",
+  "files": [
+    "specs/003-issues-classifier/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 1,
+    "assumptions": 4,
+    "decisions": 6,
+    "behaviours": 4,
+    "cases": 4,
+    "doneWhen": 3,
+    "outOfScope": 4,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T12:01:33.701Z",
+    "verdict": "approved",
+    "summary": "All three prior blockers are gone: accs.bash now hits only the flat /issues and /issues/:id/comments paths on MOCK_GITHUB_PORT (default 4123), and GITHUB_REPO is never split into owner/repo segments anywhere.",
+    "mustFix": [],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "echo \"$body\" | grep -q \"$pr\" || fail \"priority $pr not reflected in comment for issueId=$id ($phase)\"",
+        "problem": "A bare grep for a single digit can match unrelated numbers in the prose or table formatting, not just the priority/effort cells. It won't block a correct implementation, but it's a weak enough check that a wrong number could slip through undetected."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Coverage",
+        "quote": "start_mock() { ... sleep 10 }",
+        "problem": "The ACCS assumes the mock's mock-data set is identical across the restart (same issue IDs, same count) since it diffs ISSUE_IDS from before and after. That relies on the mock's dataset being fixed rather than randomized per boot, which isn't stated anywhere in this spec but is inherited from spec 001/002's mock behaviour."
+      },
+      {
+        "area": "Coverage",
+        "quote": "MOCK_SCRIPT=\"$(find_mock_script)\"",
+        "problem": "Discovery of the mock's pnpm script name is done by grepping `pnpm run` output for 'mock', so if package.json's script naming ever changes to not contain that substring, the ACCS breaks independent of classifier correctness. Worth a person double-checking the actual script name once."
+      }
+    ],
+    "fix": "full",
+    "effectiveTokens": 57602.3,
+    "specSha": "98e1e73ffbf0"
+  },
+  "application": {
+    "at": "2026-09-12T12:12:52.096Z",
+    "status": "budget-exhausted",
+    "rounds": 1,
+    "checkExitCode": 1,
+    "checkDurationMs": 217074,
+    "converged": false,
+    "summary": null,
+    "files": [],
+    "picks": [],
+    "findings": [],
+    "fix": "none",
+    "blocked": null,
+    "effectiveTokens": 1511883.8000000003,
+    "effectiveTokenBudget": 1200000,
+    "withinBudget": false,
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheCreationTokens": 0
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "98e1e73ffbf0"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "at": "2026-09-12T12:14:45.471Z",
+  "durationMs": 55078,
+  "entry": "2026-09-12 — Mock surface and LLM config — accs correction",
+  "sourceSha": "71617643581e",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 6371,
+    "cacheReadTokens": 26689,
+    "cacheCreationTokens": 9893
+  },
+  "effectiveTokens": 93880.3,
+  "outcome": "written",
+  "files": [
+    "specs/003-issues-classifier/output/accs.bash"
+  ],
+  "fixedFrom": "approved",
+  "verification": {
+    "at": "2026-09-12T12:34:37.111Z",
+    "verdict": "rejected",
+    "summary": "Implemented pnpm classify (classifier.ts, classificationsStore.ts, classificationComment.ts, classifierConfig.ts, llmClassifier.ts, classifyMain.ts) with jsonl upsert under $GENERATED_DIR/<specId>/, marker-based comment detection, and env-driven LLM config defaulted in .env.robots/.env.example. The first classify pass works end-to-end (all 20 issues CLASSIFIED, comments verified against jsonl), but the ACCS fails on its second pass: after 'stop_mock'/'start_mock', issue 1 comes back SKIPPED instead of REPOSTED, meaning the mock's in-memory comment survived the restart.",
+    "mustFix": [
+      {
+        "area": "Method",
+        "quote": "stop_mock() { [ -n \"$MOCK_PID\" ] && kill \"$MOCK_PID\" 2>/dev/null; wait \"$MOCK_PID\" 2>/dev/null; MOCK_PID=\"\" }",
+        "problem": "MOCK_PID is the pnpm wrapper's PID (from 'pnpm run mock-github &'), not the underlying tsx/node server; killing it can leave the actual mock-github process running and holding the port, so the second start_mock's readiness curl just talks to the still-alive first instance. That means the in-memory comment state never actually resets, so REPOSTED is unreachable for at least one issue and the ACCS fails deterministically regardless of classifier correctness."
+      }
+    ],
+    "shouldFix": [],
+    "shouldKnow": [],
+    "fix": "accs",
+    "by": "implementer",
+    "effectiveTokens": 0,
+    "specSha": "1d012a9dd093"
+  },
+  "application": {
+    "at": "2026-09-12T12:34:37.111Z",
+    "status": "blocked",
+    "rounds": 1,
+    "checkExitCode": 1,
+    "checkDurationMs": 230067,
+    "converged": false,
+    "summary": "Implemented pnpm classify (classifier.ts, classificationsStore.ts, classificationComment.ts, classifierConfig.ts, llmClassifier.ts, classifyMain.ts) with jsonl upsert under $GENERATED_DIR/<specId>/, marker-based comment detection, and env-driven LLM config defaulted in .env.robots/.env.example. The first classify pass works end-to-end (all 20 issues CLASSIFIED, comments verified against jsonl), but the ACCS fails on its second pass: after 'stop_mock'/'start_mock', issue 1 comes back SKIPPED instead of REPOSTED, meaning the mock's in-memory comment survived the restart.",
+    "files": [
+      "src/issue-tracker/classifier.ts",
+      "src/issue-tracker/classificationTypes.ts",
+      "src/issue-tracker/classificationsStore.ts",
+      "src/issue-tracker/classificationComment.ts",
+      "src/issue-tracker/classifierConfig.ts",
+      "src/issue-tracker/classifyMain.ts",
+      "src/issue-tracker/llmClassifier.ts",
+      "src/issue-tracker/mockGithubClient.ts",
+      "src/issue-tracker/proactiveConfig.ts",
+      "tests/issue-tracker/classificationComment.test.ts",
+      "tests/issue-tracker/classificationsStore.test.ts",
+      "tests/issue-tracker/classifier.test.ts",
+      "tests/issue-tracker/proactiveConfig.test.ts",
+      "tests/issue-tracker/proactivePoller.test.ts",
+      "package.json",
+      ".env.example",
+      ".env.robots"
+    ],
+    "picks": [
+      {
+        "decision": "CLI shape for classify command",
+        "chose": "pnpm classify --spec-id <specId>, single pass",
+        "why": "matches enriched-spec facade and existing non-daemon SDD tooling style"
+      },
+      {
+        "decision": "LLM config env var names",
+        "chose": "CLASSIFIER_MODEL, CLASSIFIER_EFFORT, CLASSIFIER_THINKING, defaulted in .env.robots",
+        "why": "enriched-spec fixed these names; defaults needed somewhere runnable out of the box"
+      },
+      {
+        "decision": "Comment table format for priority/effort",
+        "chose": "markdown table with explicit 'Priority' and 'Effort' labelled rows",
+        "why": "keeps SKIPPED-path re-parsing symmetric with generation, and satisfies ACCS's line-matching regex"
+      }
+    ],
+    "findings": [
+      {
+        "area": "Method",
+        "quote": "stop_mock() { [ -n \"$MOCK_PID\" ] && kill \"$MOCK_PID\" 2>/dev/null; wait \"$MOCK_PID\" 2>/dev/null; MOCK_PID=\"\" }",
+        "problem": "MOCK_PID is the pnpm wrapper's PID (from 'pnpm run mock-github &'), not the underlying tsx/node server; killing it can leave the actual mock-github process running and holding the port, so the second start_mock's readiness curl just talks to the still-alive first instance. That means the in-memory comment state never actually resets, so REPOSTED is unreachable for at least one issue and the ACCS fails deterministically regardless of classifier correctness."
+      }
+    ],
+    "fix": "accs",
+    "blocked": "The ACCS's mock-restart step (specs/003-issues-classifier/output/accs.bash, stop_mock/start_mock) does not reliably kill the mock-github child process, so the mock's in-memory comments survive across the 'restart', causing the second classify pass to see issue 1 as already-commented (SKIPPED) instead of memory-lost (REPOSTED). This conflicts with the spec's replay requirement, which assumes a real memory loss on mock restart.",
+    "effectiveTokens": 436386.30000000005,
+    "effectiveTokenBudget": 600000,
+    "withinBudget": true,
+    "usage": {
+      "inputTokens": 475,
+      "outputTokens": 9841,
+      "cacheReadTokens": 870044,
+      "cacheCreationTokens": 65207
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "1d012a9dd093"
+  }
+}

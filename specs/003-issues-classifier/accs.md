@@ -1,0 +1,13 @@
+- MAKE SURE THAT ONLY THE MOCK INSTANCES ARE BEING USED!
+- Ensure that you're not using the repo's .generated folder for testing, instead - create your own temporary .generated counterpart and remove it after testing
+- Run the GitHub mock
+- Run the classifier, let it classify the entries
+- Restart the GitHub mock
+- The classifier should not generate new comments, but instead it should reuse the ones from the temporary .generated
+- The comments should be visible from the GitHub API.
+- The mock serves issues at /issues and comments at /issues/:id/comments, on port 4123. There is no separate owner variable.
+- Every issue the classifier saw has exactly one entry in classifications.jsonl - no duplicates, none missing.
+- In every entry the priority is a whole number from 0 to 5 and the effort a whole number from 0 to 3. The reply is not empty, and meta carries a time above zero, an ET above zero and a non-empty llmConfig.
+- The numbers in the posted comment are the same numbers as in that issue's entry.
+- After the mock is restarted and the classifier has replayed its comments, the entries are byte for byte what they were before, meta included. A changed time or ET means it classified again instead of replaying.
+
