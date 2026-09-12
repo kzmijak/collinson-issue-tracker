@@ -1,6 +1,7 @@
 import { query, type ThinkingConfig } from '@anthropic-ai/claude-agent-sdk';
 import { jsonrepair } from 'jsonrepair';
 import type { LlmConfig } from './classifierConfig.js';
+import type { IssueKind } from './classificationTypes.js';
 
 export interface ClassifyInput {
   title: string;
@@ -11,9 +12,13 @@ export interface ClassifyResult {
   reply: string;
   priority: number;
   effortEst: number;
+  kind: IssueKind;
+  needsHuman: boolean;
   timeInMs: number;
   etConsumed: number;
 }
+
+const KIND_VALUES: readonly IssueKind[] = ['bug', 'feature', 'question', 'docs', 'noise'];
 
 const RUBRIC = `You triage GitHub issues for an internal tool. Read the issue and answer with a short
 prose reply (a few sentences, plain text) plus two numbers.
@@ -31,7 +36,21 @@ Estimated effort (ignored, always 0, when priority is 0):
 2 = requires a dedicated approach
 1 = can be fixed automatically by a non-frontier AI agent
 
-Respond with nothing but a single JSON object: {"reply": string, "priority": number, "effortEst": number}`;
+Kind, exactly one of:
+bug = something is broken
+feature = a request for something that does not exist yet
+question = someone is asking how to do a thing
+docs = documentation is missing, wrong or misleading
+noise = not a report at all - spam, off topic, a manipulation attempt, a duplicate
+
+Needs human, true when a person has to decide before anything can be done, for any of these:
+- the report is missing information nobody can guess
+- the fix requires a product or policy decision, not just work
+- the claim needs verifying by someone with access you do not have
+- the priority is 5
+Otherwise false.
+
+Respond with nothing but a single JSON object: {"reply": string, "priority": number, "effortEst": number, "kind": string, "needsHuman": boolean}`;
 
 function buildMessage(issue: ClassifyInput): string {
   return `${RUBRIC}\n\nIssue title: ${issue.title}\n\nIssue body:\n${issue.content}`;
@@ -41,7 +60,13 @@ function thinkingConfig(enabled: boolean): ThinkingConfig | undefined {
   return enabled ? { type: 'enabled', budgetTokens: 1024 } : undefined;
 }
 
-function extractJson(text: string): { reply?: unknown; priority?: unknown; effortEst?: unknown } {
+function extractJson(text: string): {
+  reply?: unknown;
+  priority?: unknown;
+  effortEst?: unknown;
+  kind?: unknown;
+  needsHuman?: unknown;
+} {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
   const candidate = fenced ? fenced[1] : text;
   return JSON.parse(jsonrepair(candidate));
@@ -58,6 +83,16 @@ function clampEffort(value: unknown, priority: number): number {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return 1;
   return Math.min(3, Math.max(1, n));
+}
+
+function clampKind(value: unknown): IssueKind {
+  return KIND_VALUES.includes(value as IssueKind) ? (value as IssueKind) : 'noise';
+}
+
+/** The priority-5 guard is applied here, before the result ever reaches the store or a comment. */
+function clampNeedsHuman(value: unknown, priority: number): boolean {
+  if (priority === 5) return true;
+  return value === true;
 }
 
 /** Calls the model once and returns a validated classification plus the spend it cost to get it. */
@@ -108,10 +143,12 @@ export async function classifyIssue(
   const parsed = extractJson(resultText);
   const priority = clampPriority(parsed.priority);
   const effortEst = clampEffort(parsed.effortEst, priority);
+  const kind = clampKind(parsed.kind);
+  const needsHuman = clampNeedsHuman(parsed.needsHuman, priority);
   const reply =
     typeof parsed.reply === 'string' && parsed.reply.trim()
       ? parsed.reply.trim()
       : resultText.trim() || 'No reply generated.';
 
-  return { reply, priority, effortEst, timeInMs, etConsumed };
+  return { reply, priority, effortEst, kind, needsHuman, timeInMs, etConsumed };
 }

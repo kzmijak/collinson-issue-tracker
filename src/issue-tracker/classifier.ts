@@ -56,6 +56,8 @@ async function processIssue(
     reply: result.reply,
     priority: result.priority,
     effortEst: result.effortEst,
+    kind: result.kind,
+    needsHuman: result.needsHuman,
     meta: {
       timeInMs: result.timeInMs,
       etConsumed: result.etConsumed,

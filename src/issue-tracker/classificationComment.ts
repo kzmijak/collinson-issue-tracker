@@ -22,6 +22,8 @@ export function renderComment(specId: string, entry: Classification): string {
     '| --- | --- |',
     `| Priority | ${entry.priority} |`,
     `| Estimated effort | ${entry.effortEst} |`,
+    `| Kind | ${entry.kind} |`,
+    `| Needs Human | ${entry.needsHuman} |`,
   ].join('\n');
 }
 

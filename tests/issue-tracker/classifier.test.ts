@@ -45,6 +45,8 @@ describe('runClassifier', () => {
       reply: 'A real bug.',
       priority: 4,
       effortEst: 2,
+      kind: 'bug',
+      needsHuman: false,
       timeInMs: 10,
       etConsumed: 20,
     });
@@ -63,7 +65,13 @@ describe('runClassifier', () => {
     expect(classifyIssue).toHaveBeenCalledTimes(1);
     expect(postComment).toHaveBeenCalledTimes(1);
     const entry = await store.get(1);
-    expect(entry).toMatchObject({ issueId: 1, priority: 4, effortEst: 2 });
+    expect(entry).toMatchObject({
+      issueId: 1,
+      priority: 4,
+      effortEst: 2,
+      kind: 'bug',
+      needsHuman: false,
+    });
   });
 
   it('skips an issue that already carries a marker comment, without calling the LLM', async () => {
@@ -100,6 +108,8 @@ describe('runClassifier', () => {
       reply: 'Cached reply',
       priority: 2,
       effortEst: 1,
+      kind: 'question',
+      needsHuman: false,
       meta: { timeInMs: 1, etConsumed: 1, llmConfig: LLM_CONFIG },
     });
     fetchIssues.mockResolvedValue([{ id: 3, title: 'T', content: 'C', comments: [] }]);
@@ -130,6 +140,8 @@ describe('runClassifier', () => {
       reply: 'Not a real report.',
       priority: 0,
       effortEst: 0,
+      kind: 'noise',
+      needsHuman: false,
       timeInMs: 5,
       etConsumed: 5,
     });
@@ -148,6 +160,8 @@ describe('runClassifier', () => {
       reply: 'ok',
       priority: 1,
       effortEst: 1,
+      kind: 'feature',
+      needsHuman: false,
       timeInMs: 1,
       etConsumed: 1,
     });

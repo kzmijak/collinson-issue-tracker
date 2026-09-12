@@ -11,6 +11,8 @@ function entry(issueId: number, overrides: Partial<Classification> = {}): Classi
     reply: `reply for ${issueId}`,
     priority: 2,
     effortEst: 1,
+    kind: 'bug',
+    needsHuman: false,
     meta: {
       timeInMs: 10,
       etConsumed: 5,

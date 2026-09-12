@@ -13,6 +13,8 @@ function entry(overrides: Partial<Classification> = {}): Classification {
     reply: 'This looks like a real bug.',
     priority: 3,
     effortEst: 2,
+    kind: 'bug',
+    needsHuman: false,
     meta: {
       timeInMs: 123,
       etConsumed: 456,
@@ -32,6 +34,12 @@ describe('classificationComment', () => {
     const rendered = renderComment('spec-x', entry({ priority: 5, effortEst: 3 }));
     expect(rendered).toContain('| Priority | 5 |');
     expect(rendered).toContain('| Estimated effort | 3 |');
+  });
+
+  it('embeds the kind and needsHuman values in the rendered table', () => {
+    const rendered = renderComment('spec-x', entry({ kind: 'feature', needsHuman: true }));
+    expect(rendered).toContain('| Kind | feature |');
+    expect(rendered).toContain('| Needs Human | true |');
   });
 
   it('recognises a body that starts with the marker', () => {
