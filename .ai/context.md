@@ -96,7 +96,7 @@ Locks (first match decides):
 - src/mock-github/ - Code for the fake github and mock data
 - src/issue-tracker/ - Code for the actual Issues Tracker
 - specs/ - SDD docs. 
-  Example: specs/021-issue-authors-whitelist/ -> spec.md, accs.md, outputs/-> metrics/, accs.bash, enriched-spec.md 
+  Example: specs/021-issue-authors-whitelist/ -> spec.md, accs.md, output/-> [ metrics/, accs.bash, enriched-spec.md ]
 - docs/ - Assessment, ADRs, documents in general
 
 # PROJECT PRINCIPLES:

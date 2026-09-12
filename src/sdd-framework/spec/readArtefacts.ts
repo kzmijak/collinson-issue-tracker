@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join, relative } from 'node:path';
 import { normaliseGeneratedPath } from './specFiles.js';
+import { OUTPUT_DIR } from './specFolder.js';
 
 const ARTEFACT_LIMIT = 20_000;
 
@@ -19,8 +20,10 @@ export async function readArtefacts(outputDir: string, files: string[]): Promise
     const content = await readFile(join(outputDir, name), 'utf8').catch(() => null);
     if (content === null) continue;
 
+    // Labelled with the folder they live in: a bare name let one verifier conclude the suite sat
+    // beside spec.md, and the enricher then wrote it there.
     parts.push(
-      `### ${name}\n\n${content.length > ARTEFACT_LIMIT ? `${content.slice(0, ARTEFACT_LIMIT)}\n… truncated …` : content}`,
+      `### ${OUTPUT_DIR}/${name}\n\n${content.length > ARTEFACT_LIMIT ? `${content.slice(0, ARTEFACT_LIMIT)}\n… truncated …` : content}`,
     );
   }
   return parts.join('\n\n');

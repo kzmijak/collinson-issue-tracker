@@ -20,8 +20,8 @@ describe('readArtefacts', () => {
       join(output, 'suite', 'check.mjs'),
     ]);
 
-    expect(text).toContain('### accs.bash');
-    expect(text).toContain('### suite/check.mjs');
+    expect(text).toContain('### output/accs.bash');
+    expect(text).toContain('### output/suite/check.mjs');
     expect(text).not.toContain('the spec');
     expect(text).not.toContain('run.json');
     expect(text).not.toContain('leftover log');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ModelContractError } from '../../../src/sdd-framework/spec/EnrichPrompt.js';
 import { VerifyPrompt } from '../../../src/sdd-framework/spec/VerifyPrompt.js';
 
-const prompt = new VerifyPrompt('# 001 — Thing\n\nprose', '### accs.bash\n\nexit 1');
+const prompt = new VerifyPrompt('# 001 — Thing\n\nprose', '### output/accs.bash\n\nexit 1');
 
 describe('VerifyPrompt', () => {
   it('accepts the fully-shaped answer', () => {

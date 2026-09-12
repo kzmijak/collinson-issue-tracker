@@ -12,7 +12,7 @@ const answer = {
 
 const prompt = new ApplyPrompt({
   spec: '# 001 — Thing\n\n## What I want\n\n### 2026-09-09 — x\n\nprose',
-  artefacts: '### accs.bash\n\nexit 1',
+  artefacts: '### output/accs.bash\n\nexit 1',
   knowledge: '',
   instructions: 'You implement specifications.',
   script: 'specs/001-thing/accs.bash',
