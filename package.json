@@ -17,6 +17,8 @@
     "mock-github": "tsx src/mock-github/main.ts",
     "prototype-issues-reader": "tsx --env-file-if-exists=.env src/issue-tracker/main.ts",
     "issues-tracker": "tsx --env-file-if-exists=.env src/issue-tracker/proactiveMain.ts",
+    "classify": "tsx --env-file-if-exists=.env.robots --env-file-if-exists=.env src/issue-tracker/classifyMain.ts",
+    "harness": "tsx --env-file-if-exists=.env.robots --env-file-if-exists=.env src/harness/main.ts",
     "enrich": "tsx --env-file-if-exists=.env src/sdd-framework/cli/enrich.ts",
     "enrich:accs": "tsx --env-file-if-exists=.env src/sdd-framework/cli/enrich.ts --accs",
     "apply": "tsx --env-file-if-exists=.env src/sdd-framework/cli/apply.ts",

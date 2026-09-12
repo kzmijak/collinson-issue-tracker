@@ -2,10 +2,10 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { agentEnv, checkEnv } from '../../../src/sdd-framework/spec/agentEnv.js';
+import { agentEnv, checkEnv, readExample } from '../../../src/sdd-framework/spec/agentEnv.js';
 
 function example(text: string): string {
-  const path = join(mkdtempSync(join(tmpdir(), 'env-')), '.env.example');
+  const path = join(mkdtempSync(join(tmpdir(), 'env-')), '.env.robots');
   writeFileSync(path, text);
   return path;
 }
@@ -40,5 +40,13 @@ describe('agentEnv', () => {
     process.env.CLAUDE_CODE_OAUTH_TOKEN = 'secret';
 
     expect(agentEnv(example('CLAUDE_CODE_OAUTH_TOKEN=\n')).CLAUDE_CODE_OAUTH_TOKEN).toBe('secret');
+  });
+
+  it('takes the defaults the implementer maintains in .env.example, and lets .env.robots win', () => {
+    const defaults = readExample('.env.example');
+    const env = checkEnv(example('GITHUB_REPO=robots/own\n'));
+
+    expect(env.GITHUB_REPO).toBe('robots/own');
+    expect(env.POLL_INTERVAL_SECONDS).toBe(defaults.POLL_INTERVAL_SECONDS);
   });
 });
