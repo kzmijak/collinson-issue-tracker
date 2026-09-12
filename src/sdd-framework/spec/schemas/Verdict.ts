@@ -36,11 +36,14 @@ export const verdictSchema = z.object({
     .describe('not a defect: a choice made alone, or coverage the ACCS does not reach'),
   fix: z
     .enum(['full', 'accs'])
+    // Missing means the safe route: a full rewrite is never wrong, only more expensive. An
+    // approved verdict has no range of fire at all, and one model saying so with null cost a whole
+    // loop — three turns and an approval — thrown away over a field that did not matter.
+    .nullish()
+    .transform((fix) => fix ?? 'full')
     .describe(
       "the range of fire when rejected — 'full': the enriched spec is flawed, so it is rewritten and the ACCS rebuilt with it; 'accs': fixing the ACCS suite alone is enough",
-    )
-    // Missing means the safe route: a full rewrite is never wrong, only more expensive.
-    .default('full'),
+    ),
 });
 
 export type Verdict = z.infer<typeof verdictSchema>;
