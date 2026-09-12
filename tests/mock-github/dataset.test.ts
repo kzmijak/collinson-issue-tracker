@@ -73,6 +73,15 @@ describe('GrowingIssueDataset', () => {
     expect(dataset.getVisibleCount()).toBe(16);
   });
 
+  it('fires onGrow once per revealed issue, not on ticks past the cap', () => {
+    const dataset = new GrowingIssueDataset();
+    const onGrow = vi.fn();
+    dataset.startGrowth(onGrow);
+
+    vi.advanceTimersByTime(GROWTH_INTERVAL_MS * 10);
+    expect(onGrow).toHaveBeenCalledTimes(MAX_VISIBLE_COUNT - INITIAL_VISIBLE_COUNT);
+  });
+
   it('stop() freezes the count where it is', () => {
     const dataset = new GrowingIssueDataset();
     dataset.startGrowth();

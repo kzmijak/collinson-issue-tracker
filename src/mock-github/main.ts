@@ -13,6 +13,6 @@ const server = createMockGithubServer(dataset, comments, (issueNumber, author) =
 });
 
 server.listen(port, () => {
-  dataset.startGrowth();
   repaint(dataset, comments);
+  dataset.startGrowth(() => repaint(dataset, comments));
 });

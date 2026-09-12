@@ -81,10 +81,11 @@ export class GrowingIssueDataset {
     return this.visibleCount;
   }
 
-  startGrowth(): void {
+  startGrowth(onGrow?: () => void): void {
     if (this.timer || this.visibleCount >= MAX_VISIBLE_COUNT) return;
     this.timer = setInterval(() => {
       this.visibleCount = growVisibleCount(this.visibleCount);
+      onGrow?.();
       if (this.visibleCount >= MAX_VISIBLE_COUNT) this.stop();
     }, GROWTH_INTERVAL_MS);
     this.timer.unref?.();
