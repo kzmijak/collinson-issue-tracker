@@ -98,12 +98,23 @@ function show(plan: CommitPlan): void {
   );
 }
 
+/** Paths the planner invented, or that something else has since committed, are not ours to stage. */
+function changed(files: string[]): string[] {
+  return files.filter((file) => git('status', '--porcelain', '--', file).trim().length > 0);
+}
+
 async function perform(plan: CommitPlan): Promise<void> {
   const linked = new Set<string>();
 
   for (const commit of plan.commits) {
+    const files = changed(commit.files);
+    if (files.length === 0) {
+      consoleLogger.info(`skipped: ${commit.message.split('\n')[0]} — nothing of it is changed`);
+      continue;
+    }
+
     git('reset', 'HEAD', '--');
-    git('add', '--', ...commit.files);
+    git('add', '--', ...files);
     git('commit', '-m', `${commit.message.trim()}\n\n${TRAILER}\n`);
 
     const subject = commit.message.split('\n')[0];
@@ -113,7 +124,7 @@ async function perform(plan: CommitPlan): Promise<void> {
       subject,
     };
     consoleLogger.info(`committed: ${note.sha} ${subject}`);
-    for (const path of await link(commit.files, note)) linked.add(path);
+    for (const path of await link(files, note)) linked.add(path);
   }
   commitNotes([...linked]);
 }
