@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { apply, type ApplyProps } from '../../../src/sdd-framework/spec/apply.js';
@@ -170,5 +171,19 @@ describe('apply', () => {
     expect(llm.calls).toBe(1);
     expect(llm.limits).toEqual([1_000_000]);
     expect(result.check?.exitCode).toBe(1);
+  });
+
+  it('counts a run cut off at the hard limit as converged when the check passes anyway', async () => {
+    // Fails the first time and passes the second, so there is work to do and it turns out done.
+    const marker = join(mkdtempSync(join(tmpdir(), 'check-')), 'ran');
+    const check = `[ -f ${marker} ] && exit 0; touch ${marker}; exit 1`;
+
+    const result = await apply(spec('approved', check), new RunsAway(), {
+      ...props,
+      rounds: 1,
+      hardEffectiveTokenLimit: 1_000_000,
+    });
+
+    expect(result.status).toBe('converged');
   });
 });

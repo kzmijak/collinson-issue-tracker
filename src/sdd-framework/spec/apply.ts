@@ -164,9 +164,11 @@ export async function apply(path: string, llm: Llm, props: ApplyProps): Promise<
     } catch (error) {
       if (!(error instanceof EffectiveTokenCeilingError)) throw error;
       effectiveTokens += llm.lastEffectiveTokens;
-      exhausted = true;
       stage(`round ${round} — aborted at the hard limit, running the check`);
       check = await runCheck(script, props.checkTimeoutMs, props.checkEnv);
+      // A run cut off mid-sentence may still have finished the work — the check, not the ledger,
+      // decides that.
+      exhausted = check.exitCode !== 0;
       break;
     }
     effectiveTokens += llm.lastEffectiveTokens;
