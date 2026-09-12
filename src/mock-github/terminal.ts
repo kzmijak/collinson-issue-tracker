@@ -27,7 +27,10 @@ function countNonBlank(lines: readonly string[]): number {
   return lines.filter((line) => line.trim() !== '').length;
 }
 
-function buildIssueBlock(issue: MockIssue, issueComments: { author: string; body: string }[]): string[] {
+function buildIssueBlock(
+  issue: MockIssue,
+  issueComments: { author: string; body: string }[],
+): string[] {
   const lines: string[] = [
     `Issues #${issue.number}: (${issueComments.length})`,
     `Title: ${issue.title}`,

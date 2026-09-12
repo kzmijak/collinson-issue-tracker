@@ -1,6 +1,10 @@
 import { fetchIssues, postComment, type MockIssueSummary } from './mockGithubClient.js';
 import { ClassificationsStore } from './classificationsStore.js';
-import { hasMarker, parseClassificationFromComment, renderComment } from './classificationComment.js';
+import {
+  hasMarker,
+  parseClassificationFromComment,
+  renderComment,
+} from './classificationComment.js';
 import { classifyIssue } from './llmClassifier.js';
 import type { Classification } from './classificationTypes.js';
 import type { LlmConfig } from './classifierConfig.js';
@@ -34,11 +38,19 @@ async function processIssue(
 
   const cached = await deps.store.get(issue.id);
   if (cached) {
-    await postComment(deps.baseUrl, issue.id, renderComment(deps.specId, cached), CLASSIFIER_AUTHOR);
+    await postComment(
+      deps.baseUrl,
+      issue.id,
+      renderComment(deps.specId, cached),
+      CLASSIFIER_AUTHOR,
+    );
     return 'REPOSTED';
   }
 
-  const result = await classifyIssue({ title: issue.title, content: issue.content }, deps.llmConfig);
+  const result = await classifyIssue(
+    { title: issue.title, content: issue.content },
+    deps.llmConfig,
+  );
   const entry: Classification = {
     issueId: issue.id,
     reply: result.reply,

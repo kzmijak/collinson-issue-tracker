@@ -91,7 +91,9 @@ describe('repaint', () => {
 
     repaint(dataset, comments);
 
-    const lines = output().split('\n').filter((line) => line.trim() !== '');
+    const lines = output()
+      .split('\n')
+      .filter((line) => line.trim() !== '');
     expect(lines.length).toBeLessThanOrEqual(5);
     expect(lines[lines.length - 1]).toBe('...');
   });
@@ -103,7 +105,9 @@ describe('repaint', () => {
 
     repaint(dataset, comments);
 
-    const lines = output().split('\n').filter((line) => line.trim() !== '');
+    const lines = output()
+      .split('\n')
+      .filter((line) => line.trim() !== '');
     expect(lines.length).toBeLessThanOrEqual(500);
     const issueIds = lines
       .map((line) => /^Issues #(\d+):/.exec(line))

@@ -18,7 +18,8 @@ vi.mock('../../src/issue-tracker/llmClassifier.js', () => ({
 
 const { runClassifier } = await import('../../src/issue-tracker/classifier.js');
 const { ClassificationsStore } = await import('../../src/issue-tracker/classificationsStore.js');
-const { markerFor, renderComment } = await import('../../src/issue-tracker/classificationComment.js');
+const { markerFor, renderComment } =
+  await import('../../src/issue-tracker/classificationComment.js');
 
 const LLM_CONFIG = { model: 'm', effort: 'low', thinking: false };
 
@@ -72,7 +73,9 @@ describe('runClassifier', () => {
         id: 2,
         title: 'Old',
         content: 'Already handled',
-        comments: [{ author: 'GitHub Issues Classifier', body: `${marker}\nold reply`, createdAt: 'now' }],
+        comments: [
+          { author: 'GitHub Issues Classifier', body: `${marker}\nold reply`, createdAt: 'now' },
+        ],
       },
     ]);
 
@@ -141,9 +144,13 @@ describe('runClassifier', () => {
       { id: 5, title: 'Fails', content: 'x', comments: [] },
       { id: 6, title: 'Fine', content: 'y', comments: [] },
     ]);
-    classifyIssue
-      .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce({ reply: 'ok', priority: 1, effortEst: 1, timeInMs: 1, etConsumed: 1 });
+    classifyIssue.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({
+      reply: 'ok',
+      priority: 1,
+      effortEst: 1,
+      timeInMs: 1,
+      etConsumed: 1,
+    });
 
     const lines: string[] = [];
     const ok = await runClassifier({

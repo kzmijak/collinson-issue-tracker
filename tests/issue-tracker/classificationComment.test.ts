@@ -13,7 +13,11 @@ function entry(overrides: Partial<Classification> = {}): Classification {
     reply: 'This looks like a real bug.',
     priority: 3,
     effortEst: 2,
-    meta: { timeInMs: 123, etConsumed: 456, llmConfig: { model: 'm', effort: 'low', thinking: false } },
+    meta: {
+      timeInMs: 123,
+      etConsumed: 456,
+      llmConfig: { model: 'm', effort: 'low', thinking: false },
+    },
     ...overrides,
   };
 }

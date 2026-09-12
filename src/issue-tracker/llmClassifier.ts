@@ -100,12 +100,18 @@ export async function classifyIssue(
   }
 
   const timeInMs = Date.now() - startedAt;
-  const etConsumed = Math.max(1, inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens);
+  const etConsumed = Math.max(
+    1,
+    inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens,
+  );
 
   const parsed = extractJson(resultText);
   const priority = clampPriority(parsed.priority);
   const effortEst = clampEffort(parsed.effortEst, priority);
-  const reply = typeof parsed.reply === 'string' && parsed.reply.trim() ? parsed.reply.trim() : resultText.trim() || 'No reply generated.';
+  const reply =
+    typeof parsed.reply === 'string' && parsed.reply.trim()
+      ? parsed.reply.trim()
+      : resultText.trim() || 'No reply generated.';
 
   return { reply, priority, effortEst, timeInMs, etConsumed };
 }
