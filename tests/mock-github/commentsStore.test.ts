@@ -27,11 +27,27 @@ describe('CommentsStore', () => {
     expect(store.getCommentsCount(2)).toBe(0);
   });
 
-  it('stamps every comment with a created_at timestamp', () => {
+  it('stamps every comment with a createdAt timestamp', () => {
     const store = new CommentsStore();
 
     const comment = store.addComment(1, 'Hello World!');
 
-    expect(() => new Date(comment.created_at).toISOString()).not.toThrow();
+    expect(() => new Date(comment.createdAt).toISOString()).not.toThrow();
+  });
+
+  it('defaults the author to Anonymous when none is given', () => {
+    const store = new CommentsStore();
+
+    const comment = store.addComment(1, 'Hello World!');
+
+    expect(comment.author).toBe('Anonymous');
+  });
+
+  it('uses the given author when provided', () => {
+    const store = new CommentsStore();
+
+    const comment = store.addComment(1, 'Hello World!', 'GitHub Issues Tracker');
+
+    expect(comment.author).toBe('GitHub Issues Tracker');
   });
 });

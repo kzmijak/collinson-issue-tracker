@@ -31,7 +31,7 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
 export function createMockGithubServer(
   dataset: GrowingIssueDataset,
   comments: CommentsStore,
-  onCommentAdded: (issueNumber: number) => void,
+  onCommentAdded: (issueNumber: number, author: string) => void,
 ): Server {
   return createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -51,6 +51,7 @@ export function createMockGithubServer(
     if (req.method === 'GET' && ISSUES_PATH.test(url.pathname)) {
       const issues = dataset.getVisibleIssues().map((issue) => ({
         ...issue,
+        comments: comments.getComments(issue.number),
         comments_count: comments.getCommentsCount(issue.number),
       }));
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(issues));
@@ -69,15 +70,33 @@ export function createMockGithubServer(
       }
 
       if (req.method === 'POST') {
+        const issueExists = dataset
+          .getVisibleIssues()
+          .some((issue) => issue.number === issueNumber);
+        if (!issueExists) {
+          res
+            .writeHead(404, { 'Content-Type': 'application/json' })
+            .end(JSON.stringify({ message: 'Not Found' }));
+          return;
+        }
+
         void readJsonBody(req).then((parsed) => {
-          const body =
-            typeof parsed === 'object' &&
-            parsed !== null &&
-            typeof (parsed as { body?: unknown }).body === 'string'
-              ? (parsed as { body: string }).body
-              : '';
-          const comment = comments.addComment(issueNumber, body);
-          onCommentAdded(issueNumber);
+          const record =
+            typeof parsed === 'object' && parsed !== null
+              ? (parsed as Record<string, unknown>)
+              : {};
+          const body = typeof record.body === 'string' ? record.body : '';
+          if (!body) {
+            res
+              .writeHead(400, { 'Content-Type': 'application/json' })
+              .end(JSON.stringify({ message: 'body is required' }));
+            return;
+          }
+          const author =
+            typeof record.author === 'string' && record.author ? record.author : 'Anonymous';
+
+          const comment = comments.addComment(issueNumber, body, author);
+          onCommentAdded(issueNumber, author);
           res.writeHead(201, { 'Content-Type': 'application/json' }).end(JSON.stringify(comment));
         });
         return;

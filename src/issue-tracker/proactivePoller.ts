@@ -1,21 +1,28 @@
 import type { MockIssueSummary } from './mockGithubClient.js';
 
+export const MARKER_AUTHOR = 'GitHub Issues Tracker';
 export const MARKER_COMMENT = "I've been here!";
 
 export interface ProactiveTrackerDeps {
   fetchIssues: (baseUrl: string) => Promise<MockIssueSummary[]>;
-  postComment: (baseUrl: string, issueNumber: number, body: string) => Promise<void>;
+  postComment: (
+    baseUrl: string,
+    issueNumber: number,
+    body: string,
+    author: string,
+  ) => Promise<void>;
   onError?: (issueNumber: number, error: unknown) => void;
 }
 
+function alreadyTouched(issue: MockIssueSummary): boolean {
+  return issue.comments.some((comment) => comment.author === MARKER_AUTHOR);
+}
+
 /**
- * Marks an issue "touched" before the comment POST resolves, not after — otherwise two poll
- * ticks racing during one slow request could each decide the issue is still untouched and both
- * post the marker.
+ * "Touched" is re-derived from each issue's own comment list on every poll rather than a private
+ * log — the only durable signal available, since neither service persists state to disk.
  */
 export class ProactiveTracker {
-  private readonly touched = new Set<number>();
-
   constructor(
     private readonly baseUrl: string,
     private readonly deps: ProactiveTrackerDeps,
@@ -25,19 +32,13 @@ export class ProactiveTracker {
     const issues = await this.deps.fetchIssues(this.baseUrl);
 
     for (const issue of issues) {
-      if (this.touched.has(issue.number)) continue;
-      this.touched.add(issue.number);
+      if (alreadyTouched(issue)) continue;
 
       try {
-        await this.deps.postComment(this.baseUrl, issue.number, MARKER_COMMENT);
+        await this.deps.postComment(this.baseUrl, issue.number, MARKER_COMMENT, MARKER_AUTHOR);
       } catch (error) {
-        this.touched.delete(issue.number);
         this.deps.onError?.(issue.number, error);
       }
     }
-  }
-
-  hasTouched(issueNumber: number): boolean {
-    return this.touched.has(issueNumber);
   }
 }
