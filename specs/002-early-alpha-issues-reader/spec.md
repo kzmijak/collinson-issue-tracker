@@ -5,7 +5,7 @@ Covers: 0
 
 ## What I want
 
-### 2026-09-10 — Init
+### 2026-09-11 — Init
 
 ONLY MOCK INSTANCES!
 
@@ -19,7 +19,7 @@ Proactive Issues Tracker
 - GitHub Service Terminal should log each time a new comment gets added.
 - GitHub console should fully reload and always paint the current state fully.
 
-### 2026-09-10 — Mock GitHub Improvements
+### 2026-09-12 — Mock GitHub Improvements
 
 Mock GitHub:
 - After each update, the console is completely cleared and the new complete state is rendered.
@@ -42,3 +42,7 @@ Comments:
 
 [...]
 Repeat for all other issues
+
+### 2026-09-12 — Mock GitHub Testing Improvements
+
+- Contract should include a way to tell apart each complete snapshot of the Mock GitHub CLI
