@@ -16,7 +16,7 @@
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "mock-github": "tsx src/mock-github/main.ts",
     "prototype-issues-reader": "tsx --env-file-if-exists=.env src/issue-tracker/main.ts",
-    "issue-tracker:proactive": "tsx --env-file-if-exists=.env src/issue-tracker/proactiveMain.ts",
+    "issues-tracker": "tsx --env-file-if-exists=.env src/issue-tracker/proactiveMain.ts",
     "enrich": "tsx --env-file-if-exists=.env src/sdd-framework/cli/enrich.ts",
     "enrich:accs": "tsx --env-file-if-exists=.env src/sdd-framework/cli/enrich.ts --accs",
     "apply": "tsx --env-file-if-exists=.env src/sdd-framework/cli/apply.ts",

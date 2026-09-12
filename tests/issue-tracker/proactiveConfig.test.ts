@@ -14,7 +14,7 @@ describe('loadProactiveConfig', () => {
     const config = loadProactiveConfig({
       GITHUB_MODE: 'mock',
       MOCK_GITHUB_PORT: '5555',
-      ISSUE_TRACKER_POLL_MS: '250',
+      ISSUES_TRACKER_POLL_INTERVAL_MS: '250',
     });
 
     expect(config).toEqual({
