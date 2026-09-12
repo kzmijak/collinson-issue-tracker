@@ -96,6 +96,11 @@
       "at": "2026-09-12T10:34:02.545Z",
       "sha": "a650726",
       "subject": "chore(reader): regenerate the ACCS script and enriched spec for the port/shape changes"
+    },
+    {
+      "at": "2026-09-12T10:34:02.613Z",
+      "sha": "448a29a",
+      "subject": "chore(metrics): record the GitHub Service Port spec run"
     }
   ]
 }

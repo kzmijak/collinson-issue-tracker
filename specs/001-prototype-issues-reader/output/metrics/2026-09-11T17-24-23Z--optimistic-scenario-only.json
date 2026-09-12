@@ -87,6 +87,11 @@
       "at": "2026-09-11T17:45:13.504Z",
       "sha": "0f4f72f",
       "subject": "chore(reader): commit the 001-prototype-issues-reader apply/verify/enrich run artefacts"
+    },
+    {
+      "at": "2026-09-12T10:34:02.437Z",
+      "sha": "e23985a",
+      "subject": "chore(reader): drop stray spec 001 output artifacts"
     }
   ]
 }
