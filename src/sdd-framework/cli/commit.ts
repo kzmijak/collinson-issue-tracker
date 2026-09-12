@@ -48,9 +48,20 @@ function workingTree(): string {
     .join('')
     .slice(0, DIFF_LIMIT);
 
+  // Untracked files have no diff, so a planner shown only `git diff HEAD` sees their names in the
+  // status and nothing else — one run left an entire feature unplaced for exactly that reason.
+  const untracked = git('ls-files', '--others', '--exclude-standard').trim();
+
   return [
     '## git status --short',
     status,
+    ...(untracked
+      ? [
+          '## new files, not yet tracked — these have no diff, and every one of them still has to ' +
+            'be placed in a commit',
+          untracked,
+        ]
+      : []),
     '## recent commits',
     git('log', '--oneline', '-8'),
     '## git diff HEAD',
