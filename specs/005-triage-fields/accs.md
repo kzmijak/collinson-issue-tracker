@@ -1,0 +1,7 @@
+- Run the GitHub mock and let the classifier make a full pass, exactly as spec 003's check does.
+- Every entry in classifications.jsonl has a kind and a needsHuman field.
+- Kind is always one of bug, feature, question, docs, noise. Any other value is a failure.
+- needsHuman is a boolean - true or false, never a string, never missing.
+- Whenever the priority is 5, needsHuman is true.
+- The comment posted on the issue shows both fields, and their values are the same ones the entry carries.
+- Spec 003's own check still passes unchanged after this spec is implemented. Run it and require exit 0.
