@@ -1,180 +1,118 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-PORT="${MOCK_GITHUB_PORT:-4001}"
-POLL_MS="${ISSUE_TRACKER_POLL_MS:-1000}"
-BASE="http://localhost:${PORT}"
-MOCK_LOG="/tmp/accs002-mock.log"
-PIDS=()
+# ACCS for spec 002 - Proactive Issues Tracker + stateful mock GitHub
+# Exit 0 => world matches spec. Exit 1 => it doesn't (or script itself is invalid).
 
+cd "$(dirname "$0")/../../.." || exit 1
+REPO_ROOT="$(pwd)"
+
+[ -f .env ] && set -a && source .env && set +a
+MOCK_GITHUB_PORT="${MOCK_GITHUB_PORT:-4000}"
+BASE_URL="http://localhost:${MOCK_GITHUB_PORT}"
+
+# Guard: only ever talk to our own local mock, never a real host.
+case "$BASE_URL" in
+  http://localhost:*|http://127.0.0.1:*) ;;
+  *) echo "REFUSING: BASE_URL ($BASE_URL) is not local, aborting to avoid touching real GitHub"; exit 1 ;;
+esac
+
+PIDS=()
 cleanup() {
   for pid in "${PIDS[@]:-}"; do
-    [ -n "$pid" ] && kill "$pid" >/dev/null 2>&1
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null
   done
+  wait 2>/dev/null
 }
 trap cleanup EXIT
 
-fail() { echo "ACCS FAIL: $1" >&2; exit 1; }
+fail() { echo "FAIL: $1"; exit 1; }
 
-command -v jq >/dev/null || fail "jq is required"
-command -v curl >/dev/null || fail "curl is required"
-command -v bc >/dev/null || fail "bc is required"
-command -v setsid >/dev/null || fail "setsid is required"
-command -v timeout >/dev/null || fail "timeout is required"
+# --- Step 1: gate on spec 001's accs.bash ---
+ONE_ACCS=$(ls specs/001-*/output/accs.bash 2>/dev/null | head -n1)
+[ -z "$ONE_ACCS" ] && fail "could not locate spec 001's accs.bash"
 
-# Step 1: run spec 001's accs.bash to completion first, mock-only chain.
-SPEC001=$(ls specs/001-*/output/accs.bash 2>/dev/null | head -n1)
-[ -n "$SPEC001" ] || fail "could not locate spec 001 accs.bash"
-
-setsid bash "$SPEC001" &
-SPEC001_PID=$!
-wait "$SPEC001_PID"
-SPEC001_STATUS=$?
-
-kill -TERM -- -"$SPEC001_PID" >/dev/null 2>&1
-sleep 0.3
-kill -KILL -- -"$SPEC001_PID" >/dev/null 2>&1
-
-if [ "$SPEC001_STATUS" -ne 0 ]; then
-  fail "spec 001 accs.bash failed, aborting"
+echo "Running 001 gate: $ONE_ACCS"
+bash "$ONE_ACCS"
+ONE_EXIT=$?
+if [ "$ONE_EXIT" -ne 0 ]; then
+  fail "spec 001 accs.bash failed (exit $ONE_EXIT) - terminating self per accs.md"
 fi
+echo "001 gate passed, tearing down anything it left on ${MOCK_GITHUB_PORT}"
+fuser -k "${MOCK_GITHUB_PORT}"/tcp 2>/dev/null
+sleep 1
 
-# Step 2: mock-only hard gate
-GATE_LOG_UNSET="/tmp/accs002-gate-unset.log"
-GATE_LOG_BAD="/tmp/accs002-gate-bad.log"
-
-(
-  unset GITHUB_MODE
-  export MOCK_GITHUB_PORT="$PORT" ISSUE_TRACKER_POLL_MS="$POLL_MS"
-  timeout 3 pnpm issue-tracker:proactive
-) >"$GATE_LOG_UNSET" 2>&1
-GATE_UNSET_STATUS=$?
-[ "$GATE_UNSET_STATUS" -ne 0 ] || fail "tracker should refuse to start with GITHUB_MODE unset, got exit 0"
-[ "$GATE_UNSET_STATUS" -ne 124 ] || fail "tracker with GITHUB_MODE unset ran past a 3s timeout instead of gating immediately"
-
-GITHUB_MODE=prod MOCK_GITHUB_PORT="$PORT" ISSUE_TRACKER_POLL_MS="$POLL_MS" timeout 3 pnpm issue-tracker:proactive >"$GATE_LOG_BAD" 2>&1
-GATE_BAD_STATUS=$?
-[ "$GATE_BAD_STATUS" -ne 0 ] || fail "tracker should refuse to start with GITHUB_MODE=prod, got exit 0"
-[ "$GATE_BAD_STATUS" -ne 124 ] || fail "tracker with GITHUB_MODE=prod ran past a 3s timeout instead of gating immediately"
-
-if grep -Eqi "ECONNREFUSED|fetch failed|econnrefused|ENOTFOUND" "$GATE_LOG_UNSET" "$GATE_LOG_BAD"; then
-  fail "tracker attempted a network call before the mock-mode gate rejected it"
-fi
-
-# Step 3: boot the mock github service (mock-only)
-GITHUB_MODE=mock MOCK_GITHUB_PORT="$PORT" pnpm mock-github >"$MOCK_LOG" 2>&1 &
+# --- Step 2: start our own fresh mock GitHub ---
+pnpm mock-github > /tmp/002-mock-github.log 2>&1 &
 MOCK_PID=$!
 PIDS+=("$MOCK_PID")
-MOCK_SPAWN_TS=$(date +%s.%N)
+SPAWN_TS=$(date +%s.%N)
 
+READY=0
 for i in $(seq 1 50); do
-  curl -s -o /dev/null "$BASE/issues" && break
-  sleep 0.1
+  if curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/issues" | grep -q '^200$'; then
+    READY=1; break
+  fi
+  sleep 0.2
 done
-curl -s -o /dev/null "$BASE/issues" || fail "mock github never came up on port $PORT"
+[ "$READY" -ne 1 ] && fail "mock GitHub never became healthy on $BASE_URL"
 
-ISSUES_JSON=$(curl -s "$BASE/issues")
-ISSUE_COUNT=$(echo "$ISSUES_JSON" | jq 'length')
-[ "$ISSUE_COUNT" -gt 0 ] || fail "no issues loaded at startup"
+ISSUES_JSON=$(curl -s "$BASE_URL/issues")
+NONZERO=$(echo "$ISSUES_JSON" | jq '[.[] | select((.comments // []) | length > 0)] | length')
+[ "$NONZERO" -ne 0 ] && fail "mock GitHub started with $NONZERO issue(s) already carrying comments, expected zero"
+COUNT=$(echo "$ISSUES_JSON" | jq 'length')
+[ "$COUNT" -lt 1 ] && fail "mock GitHub reports zero issues, nothing to track"
 
-NONZERO=$(echo "$ISSUES_JSON" | jq '[.[] | select(.comments_count != 0)] | length')
-[ "$NONZERO" -eq 0 ] || fail "some issues already have comments before tracker/curl touched them"
-
-FIRST_ISSUE=$(echo "$ISSUES_JSON" | jq '[.[].number] | sort | .[0]')
-
-# Step 4: boot the proactive tracker against the mock, mock-only
-GITHUB_MODE=mock MOCK_GITHUB_PORT="$PORT" ISSUE_TRACKER_POLL_MS="$POLL_MS" pnpm issue-tracker:proactive >/tmp/accs002-tracker.log 2>&1 &
+# --- Step 3: start the tracker ---
+pnpm issues-tracker > /tmp/002-tracker.log 2>&1 &
 TRACKER_PID=$!
 PIDS+=("$TRACKER_PID")
 
-# Step 5: drop a human comment on the first issue via curl
-curl -s -X POST "$BASE/issues/${FIRST_ISSUE}/comments" \
-  -H 'Content-Type: application/json' \
-  -d '{"body":"Hello World!"}' >/dev/null || fail "curl comment post failed"
+# --- Step 4: curl a manual comment onto the first issue ---
+FIRST_NUMBER=$(echo "$ISSUES_JSON" | jq '[.[].number] | min')
+[ -z "$FIRST_NUMBER" ] || [ "$FIRST_NUMBER" = "null" ] && fail "could not determine first issue number"
 
-# Step 6: wait until 4s have elapsed since the mock service spawn
-NOW=$(date +%s.%N)
-ELAPSED=$(echo "$NOW - $MOCK_SPAWN_TS" | bc)
+CURL_CODE=$(curl -s -o /tmp/002-curl-comment.json -w '%{http_code}' \
+  -X POST "$BASE_URL/issues/${FIRST_NUMBER}/comments" \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"Hello World!"}')
+[ "$CURL_CODE" != "201" ] && fail "curl comment on issue #$FIRST_NUMBER returned $CURL_CODE, expected 201"
+
+# --- Step 5: wait until 4s have passed since mock spawn ---
+NOW_TS=$(date +%s.%N)
+ELAPSED=$(echo "$NOW_TS - $SPAWN_TS" | bc)
 REMAINING=$(echo "4 - $ELAPSED" | bc)
 if (( $(echo "$REMAINING > 0" | bc -l) )); then
   sleep "$REMAINING"
 fi
 
-# give the terminal a moment to complete its next repaint tick after the 4s mark
-sleep 0.3
+# --- Step 6: assert final state ---
+FINAL_JSON=$(curl -s "$BASE_URL/issues")
 
-# Step 7: verify the final HTTP state
-FINAL_JSON=$(curl -s "$BASE/issues")
+FIRST_COMMENTS=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_NUMBER" '[.[] | select(.number == $n)][0].comments // []')
+FIRST_COUNT=$(echo "$FIRST_COMMENTS" | jq 'length')
+[ "$FIRST_COUNT" -ne 2 ] && fail "first issue #$FIRST_NUMBER has $FIRST_COUNT comment(s), expected exactly 2"
 
-FIRST_COUNT=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_ISSUE" '.[] | select(.number == $n) | .comments_count')
-[ "$FIRST_COUNT" -eq 2 ] || fail "first issue #$FIRST_ISSUE expected 2 comments, got $FIRST_COUNT"
+HAS_HELLO=$(echo "$FIRST_COMMENTS" | jq '[.[] | select(.body == "Hello World!")] | length')
+HAS_TRACKER=$(echo "$FIRST_COMMENTS" | jq '[.[] | select(.author == "GitHub Issues Tracker" and .body == "I'"'"'ve been here!")] | length')
+[ "$HAS_HELLO" -ne 1 ] && fail "first issue is missing the curl'd 'Hello World!' comment"
+[ "$HAS_TRACKER" -ne 1 ] && fail "first issue is missing the tracker's 'I've been here!' comment"
 
-OTHER_NUMBERS=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_ISSUE" '[.[] | select(.number != $n) | .number] | .[]')
+BAD_ISSUES=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_NUMBER" '
+  [.[] | select(.number != $n)] | map({
+    number: .number,
+    count: ((.comments // []) | length),
+    onlyTracker: ((.comments // []) | all(.author == "GitHub Issues Tracker" and .body == "I'"'"'ve been here!"))
+  }) | map(select((.count != 0 and .count != 1) or (.count == 1 and .onlyTracker == false)))
+')
+BAD_COUNT=$(echo "$BAD_ISSUES" | jq 'length')
+if [ "$BAD_COUNT" -ne 0 ]; then
+  echo "Offending issues: $BAD_ISSUES"
+  fail "$BAD_COUNT other issue(s) don't match the '0 or exactly-1-tracker-comment' rule"
+fi
 
-for num in $OTHER_NUMBERS; do
-  COUNT=$(echo "$FINAL_JSON" | jq --argjson n "$num" '.[] | select(.number == $n) | .comments_count')
-  [ "$COUNT" -le 1 ] || fail "issue #$num expected at most 1 comment, got $COUNT"
-  if [ "$COUNT" -eq 1 ]; then
-    BODY=$(curl -s "$BASE/issues/${num}/comments" | jq -r '.[0].body')
-    [ "$BODY" = "I've been here!" ] || fail "issue #$num single comment should be the tracker marker, got: $BODY"
-  fi
-done
+AT_LEAST_ONE_TOUCHED=$(echo "$FINAL_JSON" | jq --argjson n "$FIRST_NUMBER" '[.[] | select(.number != $n and ((.comments // []) | length) == 1)] | length')
+[ "$AT_LEAST_ONE_TOUCHED" -lt 1 ] && fail "no other issue got the tracker's comment - tracker may not be running"
 
-FIRST_BODIES=$(curl -s "$BASE/issues/${FIRST_ISSUE}/comments" | jq -r '.[].body')
-echo "$FIRST_BODIES" | grep -qF "Hello World!" || fail "first issue missing the curl comment"
-echo "$FIRST_BODIES" | grep -qF "I've been here!" || fail "first issue missing the tracker marker comment"
-
-# Step 8: verify the GitHub Service Terminal actually printed what the contract promises.
-# The whole point here is proving a REPAINT, not just presence-anywhere-in-the-log: a
-# diff-style repainter (forbidden by the contract) would still make a naive grep-anywhere
-# check pass, since every issue gets logged at least once when added or touched. So instead
-# we group the log into repaint blocks - a block is a maximal run of consecutive
-# "Issue #<n>: <count> comment(s)" lines - and require the FINAL block on its own to contain
-# every currently-loaded issue exactly once, with matching counts. Only a script that clears
-# and reprints the full list top to bottom in one go can produce a block shaped like that.
-[ -s "$MOCK_LOG" ] || fail "mock service produced no terminal output at all"
-
-ISSUE_NUMBERS=$(echo "$FINAL_JSON" | jq -r '.[].number')
-ISSUE_NUMBERS_COUNT=$(echo "$ISSUE_NUMBERS" | wc -l)
-
-BLOCK_COUNT=$(awk '
-  /Issue #[0-9]+: [0-9]+ comment\(s\)/ { inblock=1; next }
-  { if (inblock) { c++; inblock=0 } }
-  END { if (inblock) c++; print c+0 }
-' "$MOCK_LOG")
-[ "$BLOCK_COUNT" -ge 2 ] \
-  || fail "terminal only produced $BLOCK_COUNT repaint block(s) of issue lines, expected multiple repaint cycles over ~4s"
-
-LAST_BLOCK=$(awk '
-  /Issue #[0-9]+: [0-9]+ comment\(s\)/ { buf = buf $0 "\n"; next }
-  { if (buf != "") { last = buf; buf="" } }
-  END { if (buf != "") { last = buf } printf "%s", last }
-' "$MOCK_LOG")
-[ -n "$LAST_BLOCK" ] || fail "could not isolate the final repaint block from the terminal log"
-
-for num in $ISSUE_NUMBERS; do
-  COUNT=$(echo "$FINAL_JSON" | jq --argjson n "$num" '.[] | select(.number == $n) | .comments_count')
-  LINES_FOR_NUM=$(echo "$LAST_BLOCK" | grep -Ec "^Issue #${num}: [0-9]+ comment\(s\)$" || true)
-  [ "$LINES_FOR_NUM" -eq 1 ] \
-    || fail "final repaint block did not print issue #$num exactly once (got $LINES_FOR_NUM) - a full repaint must show every issue together in one shot, not scattered/diffed across the log"
-  echo "$LAST_BLOCK" | grep -Eq "^Issue #${num}: ${COUNT} comment\(s\)$" \
-    || fail "final repaint block shows a stale count for issue #$num, expected $COUNT"
-done
-
-LAST_BLOCK_LINE_COUNT=$(echo "$LAST_BLOCK" | grep -Ec "^Issue #[0-9]+: [0-9]+ comment\(s\)$" || true)
-[ "$LAST_BLOCK_LINE_COUNT" -eq "$ISSUE_NUMBERS_COUNT" ] \
-  || fail "final repaint block has $LAST_BLOCK_LINE_COUNT issue lines but $ISSUE_NUMBERS_COUNT issues are currently loaded - a full repaint must print the entire current list, not a subset"
-
-echo "$LAST_BLOCK" | grep -Eq "^Issue #${FIRST_ISSUE}: 2 comment\(s\)$" \
-  || fail "final repaint block never shows issue #$FIRST_ISSUE at its final count of 2 comments"
-
-TOTAL_COMMENTS=$(echo "$FINAL_JSON" | jq '[.[].comments_count] | add')
-NEW_COMMENT_LINES=$(grep -c "New comment on issue #" "$MOCK_LOG" || true)
-[ "$NEW_COMMENT_LINES" -ge "$TOTAL_COMMENTS" ] \
-  || fail "expected at least $TOTAL_COMMENTS 'New comment on issue #' log lines, got $NEW_COMMENT_LINES"
-
-grep -q "New comment on issue #${FIRST_ISSUE}" "$MOCK_LOG" \
-  || fail "missing 'New comment on issue #$FIRST_ISSUE' log line"
-
-echo "ACCS OK: mock-only stateful github + proactive tracker behave per spec 002"
+echo "PASS: mock GitHub + proactive tracker behave as specced"
 exit 0

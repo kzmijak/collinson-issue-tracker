@@ -1,0 +1,61 @@
+{
+  "at": "2026-09-12T07:43:26.606Z",
+  "durationMs": 105098,
+  "entry": "2026-09-10 — Mock GitHub Improvements",
+  "sourceSha": "c4bdf3869d9e",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 10065,
+    "cacheReadTokens": 7482,
+    "cacheCreationTokens": 17118
+  },
+  "effectiveTokens": 145041.4,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 2,
+    "assumptions": 2,
+    "decisions": 4,
+    "behaviours": 3,
+    "cases": 4,
+    "doneWhen": 2,
+    "outOfScope": 4,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T07:44:09.034Z",
+    "verdict": "approved",
+    "summary": "Both prior blocking issues are fixed: the 001-gate path and the 002 'Done when'/contract path now agree on output/accs.bash, and the mock-only enforcement was pulled back to a simple BASE_URL guard actually exercised in the script instead of an untested tracker contract clause.",
+    "mustFix": [],
+    "shouldFix": [
+      {
+        "area": "Coverage",
+        "quote": "mock GitHub terminal output | On process start and after every accepted comment mutation, the terminal is fully cleared (no scrollback append) and the entire current issue list is reprinted top to bottom",
+        "problem": "This repaint/log-line contract (also the 'New comment on issue #<n> by <author>' line) is still never asserted anywhere in accs.bash, which only checks the JSON API. Given this is half of spec.md's original ask, the idempotency guard leaves it fully unverified — same gap the previous verdict raised."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "Should the mutation endpoint validate/reject empty comment bodies? Recommend yes, reject with 400",
+        "problem": "This 400-on-empty-body behavior is a contract recommendation only, not exercised by accs.bash — correctly treated as optional per the rules, just flagging it stays untested."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 73598.2,
+    "specSha": "fdd7d0a5eb60"
+  },
+  "commits": [
+    {
+      "at": "2026-09-12T07:45:35.317Z",
+      "sha": "596abeb",
+      "subject": "spec(reader): amend 002 with mock GitHub console repaint format"
+    }
+  ]
+}

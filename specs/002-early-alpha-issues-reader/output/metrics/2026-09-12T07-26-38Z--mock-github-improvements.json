@@ -1,0 +1,70 @@
+{
+  "at": "2026-09-12T07:26:38.427Z",
+  "durationMs": 109461,
+  "entry": "2026-09-10 — Mock GitHub Improvements",
+  "sourceSha": "c4bdf3869d9e",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 50,
+    "outputTokens": 11494,
+    "cacheReadTokens": 3741,
+    "cacheCreationTokens": 23543
+  },
+  "effectiveTokens": 174645.7,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 1,
+    "assumptions": 3,
+    "decisions": 5,
+    "behaviours": 3,
+    "cases": 5,
+    "doneWhen": 3,
+    "outOfScope": 4,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T07:27:49.737Z",
+    "verdict": "rejected",
+    "summary": "The spec-001 lookup glob and the ACCS's own file path contradict the repo convention and each other, so the script will likely fail before testing anything real.",
+    "mustFix": [
+      {
+        "area": "Method",
+        "quote": "SPEC001=$(ls specs/001-*/output/accs.bash 2>/dev/null | head -n1)",
+        "problem": "The dictionary's repo layout puts accs.bash at the spec root (sibling to spec.md), not under output/. If spec 001 follows that convention, this glob finds nothing and the whole script aborts at step 1 regardless of implementation quality."
+      },
+      {
+        "area": "Method",
+        "quote": "file: specs/002-early-alpha-issues-reader/output/accs.bash",
+        "problem": "This contradicts the 'Done when' line ('specs/002-early-alpha-issues-reader/accs.bash exits 0') and the dictionary's stated layout, which places accs.bash at the spec root, not inside output/. Two different locations are asserted for the same script inside the same document."
+      },
+      {
+        "area": "Coverage",
+        "quote": "MAKE SURE THAT ONLY THE MOCK INSTANCES ARE BEING USED!",
+        "problem": "The enriched spec elevates this into a full 'mock-only enforcement' contract clause (tracker exits non-zero on bad GITHUB_MODE, before any network call) and a dedicated Behaviour row, but accs.bash never exercises that path — it only ever exports GITHUB_MODE=mock and never runs the tracker with it unset/invalid. The enforcement guarantee ships untested."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Coverage",
+        "quote": "stdout line: '--- REPAINT ---' | Printed as the first line of every terminal repaint",
+        "problem": "The whole terminal-repaint contract (marker line, per-issue block shape, 'New comment on issue #<n>' log) has no assertion anywhere in accs.bash — it checks only the HTTP JSON side. Given how much of spec.md's original ask is about what the terminal prints, this leaves that half of the feature unverified by the idempotency guard."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "First issue form the GitHub terminal should have 2 comments, the rest should have 1, it is acceptable that of the later entries have 0.",
+        "problem": "The enricher chose to verify counts via the HTTP API instead of parsing terminal stdout — a reasonable reading of the man-made accs.md wording, but worth the operator knowing this was a judgment call, not a literal terminal-log check."
+      }
+    ],
+    "fix": "full",
+    "effectiveTokens": 112075.1,
+    "specSha": "e5c81a8806b3"
+  }
+}

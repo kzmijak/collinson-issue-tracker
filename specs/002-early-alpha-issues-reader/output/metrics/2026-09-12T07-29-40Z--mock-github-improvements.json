@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-12T07:29:40.365Z",
+  "durationMs": 110625,
+  "entry": "2026-09-10 — Mock GitHub Improvements",
+  "sourceSha": "c4bdf3869d9e",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 100,
+    "outputTokens": 24261,
+    "cacheReadTokens": 22188,
+    "cacheCreationTokens": 33665
+  },
+  "effectiveTokens": 156764.4,
+  "outcome": "refused",
+  "detail": "the generated files do not include accs.bash, which the check row invokes. Got: ../accs.bash"
+}
