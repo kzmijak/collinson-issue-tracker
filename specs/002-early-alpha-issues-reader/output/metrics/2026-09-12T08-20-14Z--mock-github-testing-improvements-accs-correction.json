@@ -1,0 +1,67 @@
+{
+  "at": "2026-09-12T08:20:14.992Z",
+  "durationMs": 54879,
+  "entry": "2026-09-12 — Mock GitHub Testing Improvements — accs correction",
+  "sourceSha": "10d93b7d237f",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 75,
+    "outputTokens": 11497,
+    "cacheReadTokens": 34682,
+    "cacheCreationTokens": 13993
+  },
+  "effectiveTokens": 90812.8,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "fixedFrom": "rejected",
+  "verification": {
+    "at": "2026-09-12T08:20:56.046Z",
+    "verdict": "approved",
+    "summary": "Both previous mustFix items (zero-comments-at-startup check, per-issue comment-count check for non-first issues) are now implemented, and both shouldFix items (anonymous curl, per-issue 'been here' check) are also fixed.",
+    "mustFix": [],
+    "shouldFix": [],
+    "shouldKnow": [
+      {
+        "area": "Method",
+        "quote": "FIRST_SNAP_ISSUES=$(grep -c '^Issue #' \"$LOG\")",
+        "problem": "This counts every Issue # line across the whole log so far, not just the first snapshot's block, so the later growth comparison (SECOND_SNAP_ISSUES > FIRST_SNAP_ISSUES) is a cumulative-lines signal rather than a clean 'latest snapshot has more unique issues' signal. Still monotonic and good enough to detect streaming, just worth knowing it's not as precise as it reads."
+      },
+      {
+        "area": "Coverage",
+        "quote": "IF AT ANY POINT YOU NOTICE THAT AN ISSUES APPEARS TWICE, TERMINATE WITH AN ERROR!",
+        "problem": "accs.md's final 'check comments don't appear twice' line is implemented as a duplicate-Issue-#-per-snapshot check, matching this closing instruction's literal wording about issues repeating rather than a duplicate-comment-content check. Reasonable reading, just noting the interpretation choice."
+      }
+    ],
+    "fix": "full",
+    "effectiveTokens": 63089.1,
+    "specSha": "03dfa433f05e"
+  },
+  "application": {
+    "at": "2026-09-12T08:29:11.913Z",
+    "status": "budget-exhausted",
+    "rounds": 1,
+    "checkExitCode": 0,
+    "checkDurationMs": 26967,
+    "converged": false,
+    "summary": null,
+    "files": [],
+    "picks": [],
+    "findings": [],
+    "fix": "none",
+    "blocked": null,
+    "effectiveTokens": 1503624.8000000003,
+    "effectiveTokenBudget": 1200000,
+    "withinBudget": false,
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheCreationTokens": 0
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "03dfa433f05e"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "at": "2026-09-12T09:19:37.411Z",
+  "durationMs": 47423,
+  "entry": "2026-09-12 — GitHub Cli Revamp",
+  "sourceSha": "d16cf219e9a1",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 25,
+    "outputTokens": 4496,
+    "cacheReadTokens": 3741,
+    "cacheCreationTokens": 11655
+  },
+  "effectiveTokens": 74895.7,
+  "outcome": "contract-error",
+  "detail": "the model returned JSON that does not match the contract — missing or invalid: blocking, body. Nothing was written. The raw output is logged above."
+}

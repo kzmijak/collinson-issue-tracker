@@ -1,0 +1,49 @@
+{
+  "at": "2026-09-12T09:30:07.990Z",
+  "durationMs": 59046,
+  "entry": "2026-09-12 — GitHub Cli Revamp — accs correction",
+  "sourceSha": "d16cf219e9a1",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 150,
+    "outputTokens": 21600,
+    "cacheReadTokens": 68243,
+    "cacheCreationTokens": 44979
+  },
+  "effectiveTokens": 155501.8,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "fixedFrom": "rejected",
+  "verification": {
+    "at": "2026-09-12T09:30:47.066Z",
+    "verdict": "rejected",
+    "summary": "The previous blocker (comment-added log line never checked) is now fixed, but the tracker sweep step only guards against double-touching and checks the first issue's count — it never asserts that any issue besides the first actually received the tracker's comment, so a tracker that does nothing to everyone else would still pass.",
+    "mustFix": [
+      {
+        "area": "Coverage",
+        "quote": null,
+        "problem": "Step 7 checks FIRST_FINAL_COUNT==2 and that no issue has more than one tracker comment, but it never checks that issues other than the first (present before the tracker ran) actually gained a 'GitHub Issues Tracker' comment. accs.md expects 'the rest should have 1' with 0 only tolerated for late-loaded entries — as written, a tracker that silently does nothing for every issue but the first would still pass."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Coverage",
+        "quote": "for(const b of blocks) console.log('n='+b.n+' ids='+b.ids.length+' trunc='+b.truncated);",
+        "problem": "scan_snapshots computes line counts and a truncated flag per block but accs.bash never asserts on them, so the buffer-cap-vs-truncation behaviour stays completely untested even though the contract describes it in detail."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Method",
+        "quote": "# spec 001 script has already exited on its own; nothing more to terminate.",
+        "problem": "accs.md says to 'terminate' spec 001's script on success, but this implementation just runs it synchronously and assumes it self-exits/self-cleans; reasonable, but it's an undocumented assumption about spec 001's accs.bash shape that should be flagged in Assumptions Taken."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 62451.6,
+    "specSha": "78e03da47899"
+  }
+}

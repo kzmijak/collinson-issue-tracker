@@ -1,0 +1,67 @@
+{
+  "at": "2026-09-12T09:28:20.701Z",
+  "durationMs": 118895,
+  "entry": "2026-09-12 — GitHub Cli Revamp",
+  "sourceSha": "d16cf219e9a1",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 100,
+    "outputTokens": 23721,
+    "cacheReadTokens": 32155,
+    "cacheCreationTokens": 23074
+  },
+  "effectiveTokens": 153503.2,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "pruned": [
+    "parse-snapshots.mjs"
+  ],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 2,
+    "assumptions": 3,
+    "decisions": 5,
+    "behaviours": 6,
+    "cases": 8,
+    "doneWhen": 4,
+    "outOfScope": 4,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T09:29:08.940Z",
+    "verdict": "rejected",
+    "summary": "The prior buffer-cap blocker is fixed via MOCK_GITHUB_BUFFER_CAP, but the ACCS never checks the terminal actually prints the comment-added log line, which accs.md explicitly asks for.",
+    "mustFix": [
+      {
+        "area": "Coverage",
+        "quote": "Check if the first issue logs that it has one comment.",
+        "problem": "accs.bash only re-fetches GET /issues and counts the array after the curl POST — it never greps mock-github.log for the contract's \"[comment] issue #<id> +1 from <author>\" line. A mock service that silently mutates state without ever printing that log line would still pass."
+      }
+    ],
+    "shouldFix": [
+      {
+        "area": "Coverage",
+        "quote": "MOCK_PORT=\"${MOCK_GITHUB_PORT:-4100}\"",
+        "problem": "Contract states the default port is 4000, but accs.bash's own fallback default is 4100. It's harmless since the script always exports MOCK_GITHUB_PORT before use, but the mismatch is confusing and worth aligning."
+      },
+      {
+        "area": "Coverage",
+        "quote": "for(const b of blocks) console.log('n='+b.n+' ids='+b.ids.length+' trunc='+b.truncated);",
+        "problem": "scan_snapshots computes per-block line counts and a truncated flag but nothing in accs.bash asserts lines stay under the active cap or that truncation renders correctly — the buffer-cap behaviour is set to 500 purely to avoid tripping truncation, never actually exercised as a pass/fail check. Acceptable since accs.md doesn't demand testing truncation itself, but worth knowing it's untested."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Scope",
+        "quote": "bash \"$SPEC001_ACCS\"",
+        "problem": "Spec 001's ACCS runs as a synchronous foreground call rather than a backgrounded, explicitly-killed process, so \"terminate only the 001 script\" is satisfied by the script exiting on its own rather than by an explicit kill. Reasonable given 001's script is self-contained, just flagging the interpretation."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 137442.9,
+    "specSha": "f6f4dfa46d87"
+  }
+}

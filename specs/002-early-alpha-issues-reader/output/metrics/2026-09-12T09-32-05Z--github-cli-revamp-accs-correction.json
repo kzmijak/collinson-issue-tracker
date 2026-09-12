@@ -1,0 +1,59 @@
+{
+  "at": "2026-09-12T09:32:05.066Z",
+  "durationMs": 68870,
+  "entry": "2026-09-12 — GitHub Cli Revamp — accs correction",
+  "sourceSha": "d16cf219e9a1",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 25,
+    "outputTokens": 8512,
+    "cacheReadTokens": 9018,
+    "cacheCreationTokens": 9432
+  },
+  "effectiveTokens": 110553.6,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "fixedFrom": "rejected",
+  "verification": {
+    "at": "2026-09-12T09:32:53.142Z",
+    "verdict": "approved",
+    "summary": "Both prior blockers are now fixed — the coverage check confirms every pre-tracker issue actually got touched, and the cap/truncation rules are enforced (not just computed) via scan_snapshots' exit codes feeding assert_no_dupes.",
+    "mustFix": [],
+    "shouldFix": [],
+    "shouldKnow": [
+      {
+        "area": "Method",
+        "quote": "unset GITHUB_TOKEN GH_TOKEN",
+        "problem": "Mock-only enforcement relies on absence of these two env vars rather than asserting the actual command invoked is the mock service. Acceptable given the script only ever calls `pnpm mock-github` / `pnpm issues-tracker`, but it's a soft guarantee, not a hard one."
+      },
+      {
+        "area": "Coverage",
+        "quote": "sleep \"$(( (ISSUES_TRACKER_POLL_INTERVAL_MS/1000) * 3 + 2 ))\"",
+        "problem": "With default settings this gives the tracker ~8s combined with earlier waits, which lands after the 10s mock-load window in most runs but isn't strictly guaranteed if step 4/5 finish faster than expected. Worth padding if this ever flakes."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 72631.6,
+    "specSha": "111d99fc2458"
+  },
+  "commits": [
+    {
+      "at": "2026-09-12T09:33:45.557Z",
+      "sha": "731ffe8",
+      "subject": "spec(reader): amend 002 with the GitHub CLI revamp"
+    },
+    {
+      "at": "2026-09-12T09:33:45.633Z",
+      "sha": "76496b7",
+      "subject": "feat(reader): enforce the buffer cap and duplicate/truncation checks in ACCS"
+    },
+    {
+      "at": "2026-09-12T09:33:45.660Z",
+      "sha": "66e88af",
+      "subject": "chore(reader): regenerate the enriched spec for the GitHub CLI revamp"
+    }
+  ]
+}
