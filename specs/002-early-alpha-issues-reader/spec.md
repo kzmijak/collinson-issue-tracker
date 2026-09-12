@@ -46,3 +46,10 @@ Repeat for all other issues
 ### 2026-09-12 — Mock GitHub Testing Improvements
 
 - Contract should include a way to tell apart each complete snapshot of the Mock GitHub CLI
+
+### 2026-09-12 — GitHub Cli Revamp
+
+- The size of the presentational layer cli buffer is equal to the lesser of these two - Window TTY and 200
+- Each update clear the entire presentation layer and paints it a new, along with the scrolling buffer
+- If the content does not fit inside the buffer, the bottom line says "..." (the line has to fit in the limit)
+- If no TTY - fallback to 200 lines
