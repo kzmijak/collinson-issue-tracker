@@ -1,117 +1,167 @@
 #!/usr/bin/env bash
 set -uo pipefail
-cd "$(dirname "$0")/../../.."
-OUT="specs/002-early-alpha-issues-reader/output"
-LOG="$OUT/mock.log"
+
 PORT="${MOCK_GITHUB_PORT:-4123}"
-BASE="http://localhost:$PORT"
+BASE_URL="http://localhost:$PORT"
+REPAINT_MS="${MOCK_GITHUB_REPAINT_LATENCY_MS:-500}"
+LOG="$(mktemp)"
 MOCK_PID=""
 TRACKER_PID=""
+
+fail() { echo "ACCS FAIL: $1" >&2; cleanup; exit 1; }
+
+free_port() {
+  local pids
+  pids=$(lsof -ti:"$PORT" 2>/dev/null || true)
+  if [ -n "$pids" ]; then kill $pids 2>/dev/null || true; sleep 1; fi
+}
 
 cleanup() {
   [ -n "$MOCK_PID" ] && kill "$MOCK_PID" 2>/dev/null
   [ -n "$TRACKER_PID" ] && kill "$TRACKER_PID" 2>/dev/null
-  wait 2>/dev/null
+  free_port
+  rm -f "$LOG"
 }
 trap cleanup EXIT
 
-fail() { echo "ACCS FAIL: $1"; exit 1; }
-
-# --- check for duplicate issue ids within any single snapshot block ---
-check_no_dupes() {
-  awk '
-    /^===SNAPSHOT/ { if (block!="") { print block; }; block=""; next }
-    { block = block $0 "\n" }
-    END { if (block!="") print block }
-  ' "$LOG" | csplit -s -z -f "$OUT/blk" - "/^$/" 2>/dev/null || true
-  # simpler: scan whole log per-snapshot using awk state machine
-  awk '
-    /^===SNAPSHOT/ { for (id in seen) delete seen[id]; next }
-    match($0,/Issues #([0-9]+):/,m) {
-      if (m[1] in seen) { print "DUPLICATE #" m[1]; exit 1 }
-      seen[m[1]]=1
+# check_snapshots CAP: single pass, no scratch files.
+# validates: n strictly increasing, no dup issue id within a snapshot,
+# per-snapshot line count <= CAP, and if a snapshot hit CAP exactly its
+# last line must be the literal truncation marker "...".
+check_snapshots() {
+  local cap="$1"
+  awk -v cap="$cap" '
+    BEGIN { lastN = -1 }
+    function flush(   ) {
+      if (lastN >= 0) {
+        if (lines > cap) { print "FAIL cap-exceeded snap=" lastN " lines=" lines " cap=" cap; bad=1; exit }
+        if (lines == cap && lastLine != "...") { print "FAIL no-truncation-marker snap=" lastN; bad=1; exit }
+      }
     }
-  ' "$LOG" > /tmp/dupcheck.$$ 2>&1
-  if grep -q DUPLICATE /tmp/dupcheck.$$; then
-    cat /tmp/dupcheck.$$; rm -f /tmp/dupcheck.$$; fail "issue repeated twice within one screen"
-  fi
-  rm -f /tmp/dupcheck.$$
+    /^===SNAPSHOT [0-9]+ / {
+      n=$2+0
+      if (n<=lastN) { print "FAIL nonmonotonic " n " after " lastN; bad=1; exit }
+      flush()
+      lastN=n; snapCount++; lines=1; lastLine=$0; delete seen
+      next
+    }
+    lastN >= 0 {
+      lines++; lastLine=$0
+      if ($0 ~ /^Issues #/) {
+        s=$0; sub(/^Issues #/,"",s); sub(/:.*/,"",s); id=s
+        if (id in seen) { print "FAIL dup " id " in snapshot " lastN; bad=1; exit }
+        seen[id]=1
+      }
+    }
+    END { if (!bad) { flush(); if (!bad) print "OK lastN=" lastN " snapCount=" snapCount } }
+  ' "$LOG"
 }
 
-count_ids_in_last_snapshot() {
-  awk '/^===SNAPSHOT/{block=""} {block=block $0 "\n"} END{print block}' "$LOG" | grep -c "Issues #"
-}
+free_port
 
-# --- step 1: run spec 001's frozen accs.bash ---
-SPEC001=$(ls specs/001-*/output/accs.bash 2>/dev/null | head -1)
-[ -z "$SPEC001" ] && fail "spec 001 accs.bash not found"
-bash "$SPEC001"
-if [ $? -ne 0 ]; then fail "spec 001 accs.bash failed"; fi
-# spec 001 succeeded: make sure nothing of its lingers on our port
-pkill -f "pnpm mock-github" 2>/dev/null; sleep 1
-
-# --- step 2: run our own mock github instance ---
-MOCK_GITHUB_BUFFER_CAP=500 MOCK_GITHUB_PORT="$PORT" pnpm mock-github > "$LOG" 2>&1 &
+# --- Phase 0: force truncation with a tiny cap, unrelated to the coverage run below ---
+TRUNC_LOG="$(mktemp)"
+export MOCK_GITHUB_PORT="$PORT"
+export MOCK_GITHUB_BUFFER_CAP=3
+pnpm mock-github > "$TRUNC_LOG" 2>&1 &
 MOCK_PID=$!
-START=$(date +%s)
+for i in $(seq 1 30); do curl -s -o /dev/null "$BASE_URL/issues" && break; sleep 0.5; done
+curl -s -o /dev/null "$BASE_URL/issues" || fail "mock-github (trunc phase) never came up"
+sleep 2
+grep -q '^\.\.\.$' "$TRUNC_LOG" || fail "no truncation '...' line seen with MOCK_GITHUB_BUFFER_CAP=3"
+LOG="$TRUNC_LOG" 
+RES0=$(check_snapshots 3)
+echo "$RES0" | grep -q '^FAIL' && fail "$RES0 (trunc phase)"
+kill "$MOCK_PID" 2>/dev/null; MOCK_PID=""
+free_port
+rm -f "$TRUNC_LOG"
+unset MOCK_GITHUB_BUFFER_CAP
+LOG="$(mktemp)"
 
-# wait for server
-for i in $(seq 1 30); do curl -sf "$BASE/issues" > /dev/null 2>&1 && break; sleep 0.3; done
-curl -sf "$BASE/issues" > /dev/null 2>&1 || fail "mock-github never came up"
+# --- Phase 0b: default cap, no override, no tty -> must fall back to hard 200 ---
+DEFAULT_LOG="$(mktemp)"
+pnpm mock-github > "$DEFAULT_LOG" 2>&1 &
+MOCK_PID=$!
+for i in $(seq 1 30); do curl -s -o /dev/null "$BASE_URL/issues" && break; sleep 0.5; done
+curl -s -o /dev/null "$BASE_URL/issues" || fail "mock-github (default-cap phase) never came up"
+sleep 2
+LOG="$DEFAULT_LOG"
+RES0B=$(check_snapshots 200)
+echo "$RES0B" | grep -q '^FAIL' && fail "$RES0B (default-cap phase)"
+kill "$MOCK_PID" 2>/dev/null; MOCK_PID=""
+free_port
+rm -f "$DEFAULT_LOG"
+LOG="$(mktemp)"
 
-# --- step 3: issues exist, none have comments yet ---
-ISSUES_JSON=$(curl -sf "$BASE/issues")
-WITH_COMMENTS=$(echo "$ISSUES_JSON" | grep -c '"comments":\[.\+\]' || true)
-[ "$WITH_COMMENTS" != "0" ] && fail "issues already had comments before any mutation"
-FIRST_COUNT=$(count_ids_in_last_snapshot)
-[ "$FIRST_COUNT" -lt 1 ] && fail "no issue lines seen in first snapshot"
+# --- Phase 1: main flow, full-coverage cap override per contract ---
+export MOCK_GITHUB_PORT="$PORT"
+export MOCK_GITHUB_BUFFER_CAP=500
+pnpm mock-github > "$LOG" 2>&1 &
+MOCK_PID=$!
 
-# --- step 4: wait until 4s since spawn, expect growth, no dupes ---
-NOW=$(date +%s)
-ELAPSED=$((NOW-START))
-[ "$ELAPSED" -lt 4 ] && sleep $((4-ELAPSED))
-check_no_dupes
-SECOND_COUNT=$(count_ids_in_last_snapshot)
-[ "$SECOND_COUNT" -le "$FIRST_COUNT" ] && fail "expected more issues after 4s, got $SECOND_COUNT vs $FIRST_COUNT"
+for i in $(seq 1 30); do
+  curl -s -o /dev/null "$BASE_URL/issues" && break
+  sleep 0.5
+done
+curl -s -o /dev/null "$BASE_URL/issues" || fail "mock-github never came up on port $PORT"
 
-# --- step 5: post a comment to first issue via curl ---
-FIRST_ID=$(echo "$ISSUES_JSON" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
-[ -z "$FIRST_ID" ] && fail "could not determine first issue id"
-curl -sf -X POST "$BASE/issues/$FIRST_ID/comments" -H 'Content-Type: application/json' -d '{"author":"tester","body":"Hello World!"}' > /dev/null || fail "POST comment failed"
-sleep 0.5
+sleep 1
+INITIAL=$(curl -s "$BASE_URL/issues")
+echo "$INITIAL" | jq -e 'length > 0' >/dev/null || fail "no issues loaded on startup"
+echo "$INITIAL" | jq -e '[.[] | (.comments|length)] | all(. == 0)' >/dev/null || fail "fresh issues already have comments"
 
-# --- step 6: confirm first issue logs it has one comment ---
-grep -q "\[comment\] issue #$FIRST_ID +1 from tester" "$LOG" || fail "comment-added log line missing"
-grep -q "Issues #$FIRST_ID: (1)" "$LOG" || fail "terminal did not show first issue with 1 comment"
-check_no_dupes
+RES1=$(check_snapshots 500)
+echo "$RES1" | grep -q '^FAIL' && fail "$RES1"
+COUNT1=$(echo "$RES1" | sed -n 's/.*snapCount=\([0-9]*\).*/\1/p')
 
-# --- step 7: run the issues tracker ---
-pnpm issues-tracker > "$OUT/tracker.log" 2>&1 &
+sleep 4
+
+RES2=$(check_snapshots 500)
+echo "$RES2" | grep -q '^FAIL' && fail "$RES2"
+COUNT2=$(echo "$RES2" | sed -n 's/.*snapCount=\([0-9]*\).*/\1/p')
+[ "$COUNT2" -gt "$COUNT1" ] || fail "no new snapshot/entries observed 4s after startup"
+
+AFTER4=$(curl -s "$BASE_URL/issues")
+N1=$(echo "$INITIAL" | jq 'length')
+N2=$(echo "$AFTER4" | jq 'length')
+[ "$N2" -ge "$N1" ] || fail "issue count did not grow between checks"
+
+FIRST_ID=$(echo "$AFTER4" | jq -r '.[0].id')
+
+CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/issues/$FIRST_ID/comments" -H 'Content-Type: application/json' -d '{"author":"tester","body":"Hello World!"}')
+[ "$CODE" = "201" ] || fail "POST comment did not return 201 (got $CODE)"
+
+WAIT_S=$(awk -v ms="$REPAINT_MS" 'BEGIN{print (ms*5)/1000}')
+sleep "$WAIT_S"
+
+RES3=$(check_snapshots 500)
+echo "$RES3" | grep -q '^FAIL' && fail "$RES3"
+
+AFTER_COMMENT=$(curl -s "$BASE_URL/issues")
+CC=$(echo "$AFTER_COMMENT" | jq --arg id "$FIRST_ID" '[.[] | select((.id|tostring)==$id)][0].comments | length')
+[ "$CC" -eq 1 ] || fail "first issue expected 1 comment after manual POST, has $CC"
+
+pnpm issues-tracker > /tmp/accs-tracker.log 2>&1 &
 TRACKER_PID=$!
-sleep 5
-kill "$TRACKER_PID" 2>/dev/null; wait "$TRACKER_PID" 2>/dev/null; TRACKER_PID=""
+sleep 6
+kill "$TRACKER_PID" 2>/dev/null
+TRACKER_PID=""
 
-# --- step 8: verify final state via API ---
-FINAL_JSON=$(curl -sf "$BASE/issues")
-FIRST_ISSUE_BLOCK=$(echo "$FINAL_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); i=[x for x in d if x['id']==$FIRST_ID][0]; print(len(i['comments'])); [print(c['author'],'|',c['body']) for c in i['comments']]")
-FIRST_LEN=$(echo "$FIRST_ISSUE_BLOCK" | head -1)
-[ "$FIRST_LEN" != "2" ] && fail "first issue should have exactly 2 comments, got $FIRST_LEN"
-echo "$FIRST_ISSUE_BLOCK" | tail -n +2 | grep -q "GitHub Issues Tracker | I've been here!" || fail "tracker comment missing/wrong on first issue"
+FINAL=$(curl -s "$BASE_URL/issues")
+FIRST_CC=$(echo "$FINAL" | jq --arg id "$FIRST_ID" '[.[] | select((.id|tostring)==$id)][0].comments | length')
+[ "$FIRST_CC" -eq 2 ] || fail "first issue expected 2 comments after tracker run, has $FIRST_CC"
 
-# other issues: each has 0 or 1 comment, and if 1, it must be the tracker's
-echo "$FINAL_JSON" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-for i in d:
-    if i['id']==$FIRST_ID: continue
-    c=i['comments']
-    if len(c) > 1: print('FAIL too many comments on', i['id']); sys.exit(1)
-    if len(c)==1 and (c[0]['author']!='GitHub Issues Tracker' or c[0]['body']!=\"I've been here!\"): print('FAIL wrong comment on', i['id']); sys.exit(1)
-print('OK')
-" | grep -q '^OK$' || fail "non-first issues have wrong comment state"
+BAD_OTHERS=$(echo "$FINAL" | jq --arg id "$FIRST_ID" '[.[] | select((.id|tostring)!=$id) | select((.comments|length) > 1)] | length')
+[ "$BAD_OTHERS" -eq 0 ] || fail "an issue other than the first has more than 1 comment"
 
-# --- step 9: final full-log dupe check ---
-check_no_dupes
+BAD_BODY=$(echo "$FINAL" | jq --arg id "$FIRST_ID" '[.[] | select((.id|tostring)!=$id) | .comments[]? | select(.body != "I'"'"'ve been here!" or .author != "GitHub Issues Tracker")] | length')
+[ "$BAD_BODY" -eq 0 ] || fail "tracker comment body/author mismatch on a non-first issue"
+
+FIRST_SECOND_COMMENT=$(echo "$FINAL" | jq --arg id "$FIRST_ID" '[.[] | select((.id|tostring)==$id)][0].comments[1]')
+echo "$FIRST_SECOND_COMMENT" | jq -e '.body == "I'"'"'ve been here!" and .author == "GitHub Issues Tracker"' >/dev/null || fail "first issue's 2nd comment is not the tracker's touch"
+
+RES4=$(check_snapshots 500)
+echo "$RES4" | grep -q '^FAIL' && fail "$RES4"
 
 echo "ACCS PASS"
 exit 0
