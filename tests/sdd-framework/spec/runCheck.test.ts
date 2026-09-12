@@ -49,12 +49,18 @@ describe('excerpt', () => {
   });
 
   it('collects what the check left running, even in a process group of its own', async () => {
-    const marker = `accs-stray-${process.pid}`;
-    await runCheck(script(`setsid sleep 60 >/dev/null 2>&1 & echo ${marker}; exit 1`), 5_000);
+    // A duration nothing else would use, so the search cannot match another run's leftovers.
+    const marker = `60.${process.pid}`;
+    await runCheck(script(`setsid sleep ${marker} >/dev/null 2>&1 & exit 1`), 5_000);
 
-    const alive = execFileSync('bash', ['-c', 'ps -eo cmd | grep -c "[s]leep 60" || true'], {
-      encoding: 'utf8',
-    });
-    expect(alive.trim()).toBe('0');
+    const alive = () => {
+      try {
+        return execFileSync('pgrep', ['-f', `sleep ${marker}`], { encoding: 'utf8' }).trim();
+      } catch {
+        return '';
+      }
+    };
+
+    expect(alive()).toBe('');
   });
 });

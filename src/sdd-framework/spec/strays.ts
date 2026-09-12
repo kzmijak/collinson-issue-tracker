@@ -16,7 +16,8 @@ export interface ProcessEntry {
  * against a mock that had finished growing forty minutes earlier.
  *
  * What gets killed is deliberately narrow: started during this run, working in this repository, and
- * outside our own process group, so nothing the operator is running by hand is touched.
+ * neither us nor another framework command, so a `pnpm verify` the operator starts alongside an
+ * apply is left alone.
  */
 export function strays(
   table: ProcessEntry[],
@@ -31,9 +32,13 @@ export function strays(
     (entry) =>
       !before.has(entry.pid) &&
       !ours.has(entry.pid) &&
+      !entry.command.includes(FRAMEWORK) &&
       (entry.cwd === repoRoot || entry.cwd.startsWith(`${repoRoot}/`)),
   );
 }
+
+/** Any other framework command: the operator runs enrich, verify and apply side by side. */
+const FRAMEWORK = 'sdd-framework';
 
 /** Us and everything that started us: killing our own line would end the run reporting the sweep. */
 function ancestry(byPid: Map<number, ProcessEntry>, self: number): Set<number> {

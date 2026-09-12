@@ -16,6 +16,7 @@ describe('strays', () => {
     entry(300, 200, REPO), // a server the run started
     entry(400, 1, REPO), // one that was already running
     entry(500, 1, '/home/dev/elsewhere'), // someone else's work
+    { ...entry(600, 1, REPO), command: 'node src/sdd-framework/cli/verify.ts 003' },
   ];
 
   it('names what this run left running in the repository', () => {
@@ -34,5 +35,11 @@ describe('strays', () => {
     const outside = strays(table, new Set([100, 200]), REPO, 200).map((process) => process.pid);
 
     expect(outside).not.toContain(500);
+  });
+
+  it('leaves another framework command alone, even one started mid-run', () => {
+    const left = strays(table, new Set([100, 200, 400, 500]), REPO, 200).map((p) => p.pid);
+
+    expect(left).not.toContain(600);
   });
 });
