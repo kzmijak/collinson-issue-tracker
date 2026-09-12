@@ -1,9 +1,16 @@
 import type { CommentsStore } from './commentsStore.js';
 import type { GrowingIssueDataset } from './dataset.js';
 
-/** Full clear (no scrollback append) + reprint of the entire current issue list, top to bottom. */
+let snapshotCounter = 0;
+
+/**
+ * Full clear + reprint of the entire current issue list, top to bottom, prefixed by a strictly
+ * increasing `Snapshot #<n>` header so ACCS can split captured stdout into distinct repaints.
+ */
 export function repaint(dataset: GrowingIssueDataset, comments: CommentsStore): void {
-  process.stdout.write('\x1B[2J\x1B[0f');
+  snapshotCounter += 1;
+  process.stdout.write('\x1B[2J\x1B[H\n');
+  console.warn(`Snapshot #${snapshotCounter}`);
   for (const issue of dataset.getVisibleIssues()) {
     const issueComments = comments.getComments(issue.number);
     console.warn(`Issue #${issue.number}: (${issueComments.length})`);
