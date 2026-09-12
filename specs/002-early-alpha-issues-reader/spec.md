@@ -53,3 +53,8 @@ Repeat for all other issues
 - Each update clear the entire presentation layer and paints it a new, along with the scrolling buffer
 - If the content does not fit inside the buffer, the bottom line says "..." (the line has to fit in the limit)
 - If no TTY - fallback to 200 lines
+
+### 2026-09-12 — GitHub Service Port
+
+- GitHub Service has to use port 4123.
+- Applies to .env.example

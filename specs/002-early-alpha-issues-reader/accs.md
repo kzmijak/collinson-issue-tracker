@@ -1,6 +1,5 @@
 - MAKE SURE THAT ONLY THE MOCK INSTANCES ARE BEING USED!
 - Make sure that you spawn the processes in the CLIs high enough to fit in the entire list of entries!
-- Run Spec 001 accs.bash. If it fails, terminate it and self. If succeeds, terminate only the 001 script.
 - Run the GitHub mock service. Ensure that there are Issues but all of them without any comments. 
 - Ensure that 4 seconds have passed since the GitHub mock service spawn. Check again, the should be more entries than the last time, none of the ever repeating. Since the cli should be cleared on each update, no issue should appear twice.
 - Make a new comment "Hello World!" under the first Issue using curl. 
