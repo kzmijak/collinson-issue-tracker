@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommentsStore } from '../../src/mock-github/commentsStore.js';
 import { GrowingIssueDataset } from '../../src/mock-github/dataset.js';
 import { logNewComment, repaint } from '../../src/mock-github/terminal.js';
@@ -17,11 +17,15 @@ describe('repaint', () => {
     });
   });
 
+  afterEach(() => {
+    delete process.env.MOCK_GITHUB_BUFFER_CAP;
+  });
+
   function output(): string {
     return writes.join('');
   }
 
-  it('prefixes every repaint with the ANSI clear code followed by its own Snapshot line', () => {
+  it('prefixes every repaint with the ANSI clear code followed by its own snapshot marker', () => {
     const dataset = new GrowingIssueDataset();
     const comments = new CommentsStore();
 
@@ -29,14 +33,14 @@ describe('repaint', () => {
     repaint(dataset, comments);
 
     const lines = output().split('\n');
-    const snapshotLines = lines.filter((line) => line.startsWith('Snapshot #'));
+    const snapshotLines = lines.filter((line) => /^===SNAPSHOT \d+ .+===$/.test(line));
     expect(snapshotLines.length).toBe(2);
 
     const firstClearIndex = output().indexOf('\x1B[2J\x1B[H');
     expect(firstClearIndex).toBeGreaterThanOrEqual(0);
   });
 
-  it('numbers snapshots strictly increasing across calls, never repeating', () => {
+  it('numbers snapshots strictly increasing, never repeating', () => {
     const dataset = new GrowingIssueDataset();
     const comments = new CommentsStore();
 
@@ -46,9 +50,11 @@ describe('repaint', () => {
 
     const numbers = output()
       .split('\n')
-      .filter((line) => line.startsWith('Snapshot #'))
-      .map((line) => Number(line.replace('Snapshot #', '')));
+      .map((line) => /^===SNAPSHOT (\d+) /.exec(line))
+      .filter((match): match is RegExpExecArray => match !== null)
+      .map((match) => Number(match[1]));
 
+    expect(numbers.length).toBe(3);
     expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
     expect(new Set(numbers).size).toBe(numbers.length);
   });
@@ -61,17 +67,45 @@ describe('repaint', () => {
     repaint(dataset, comments);
 
     const lines = output().split('\n');
-    const issueOneLines = lines.filter((line) => line.startsWith('Issue #1:'));
-    expect(issueOneLines).toEqual(['Issue #1: (1)']);
+    const issueOneLines = lines.filter((line) => line.startsWith('Issues #1:'));
+    expect(issueOneLines).toEqual(['Issues #1: (1)']);
+  });
+
+  it('truncates to the buffer cap and ends the screen with "..."', () => {
+    process.env.MOCK_GITHUB_BUFFER_CAP = '5';
+    const dataset = new GrowingIssueDataset();
+    const comments = new CommentsStore();
+
+    repaint(dataset, comments);
+
+    const lines = output().split('\n').filter((line) => line.trim() !== '');
+    expect(lines.length).toBeLessThanOrEqual(5);
+    expect(lines[lines.length - 1]).toBe('...');
+  });
+
+  it('never exceeds the cap and never repeats an issue when capped generously', () => {
+    process.env.MOCK_GITHUB_BUFFER_CAP = '500';
+    const dataset = new GrowingIssueDataset();
+    const comments = new CommentsStore();
+
+    repaint(dataset, comments);
+
+    const lines = output().split('\n').filter((line) => line.trim() !== '');
+    expect(lines.length).toBeLessThanOrEqual(500);
+    const issueIds = lines
+      .map((line) => /^Issues #(\d+):/.exec(line))
+      .filter((match): match is RegExpExecArray => match !== null)
+      .map((match) => match[1]);
+    expect(new Set(issueIds).size).toBe(issueIds.length);
   });
 });
 
 describe('logNewComment', () => {
-  it('writes the mutation log line with issue number and author', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('writes the mutation log line with issue id and author', () => {
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     logNewComment(3, 'curl-user');
 
-    expect(warn).toHaveBeenCalledWith('New comment on issue #3 by curl-user');
+    expect(log).toHaveBeenCalledWith('[comment] issue #3 +1 from curl-user');
   });
 });
