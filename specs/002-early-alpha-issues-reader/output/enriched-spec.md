@@ -1,21 +1,23 @@
 <!-- enrich:meta
 generated: 2026-09-12
-source-sha: c4bdf3869d9e
+source-sha: d16cf219e9a1
 status: approved
-from: 2026-09-10 — Init
-from: 2026-09-10 — Mock GitHub Improvements
+from: 2026-09-11 — Init
+from: 2026-09-12 — Mock GitHub Improvements
+from: 2026-09-12 — Mock GitHub Testing Improvements
+from: 2026-09-12 — GitHub Cli Revamp
 file: specs/002-early-alpha-issues-reader/output/accs.bash
 -->
 
 ## Read this first
 
-Adds a comment-writing endpoint to the mock GitHub service and a proactive tracker that leaves an "I've been here!" comment on every issue it hasn't touched yet, with the mock terminal repainting full state on every change.
+Mock GitHub serves issues and comments in memory with a bounded, snapshot-marked terminal view, and the Issues Tracker leaves a one-time 'I've been here!' comment on every untouched issue.
 
 |              |     |
 | ------------ | --- |
 | **Check**    | `bash output/accs.bash` |
-| **Numbers**  | initial mock load - 60% of issues at t=0, 100% by t=10s (carried from 001) - tracker poll interval default - 1000ms - ACCS check window - 4s after mock service spawn - screen repaint trigger - every accepted comment mutation |
-| **Not this** | no persistence across process restarts for either service - no comment editing or deletion - no auth/token check on the mutation endpoint - no real GitHub calls of any kind - no concurrent-write locking or conflict handling on the comments endpoint |
+| **Numbers**  | default port - 4000 - default poll interval - 2000ms - buffer cap (default) - min(tty rows, 200) - fallback buffer (no tty, default) - 200 - buffer cap (override) - MOCK_GITHUB_BUFFER_CAP if set - accs override value - 500 - initial mock load - 60% instant, rest over 10s (spec 001, unchanged) |
+| **Not this** | no persistence across restarts - no real GitHub API calls anywhere in this spec - no comment editing/deletion - no auth on mutation endpoint - no pagination on GET /issues - no concurrent multi-tracker dedupe beyond author-name check |
 
 ## Contract
 
@@ -23,64 +25,91 @@ The facades the ACCS may rely on — nothing else about the implementation can b
 
 | facade | promise |
 | ------ | ------- |
-| pnpm mock-github | Starts the in-memory stateful mock GitHub service, seeded exactly like 001 (60% of issues at t=0, remainder streamed in linearly over the next 10s), plus a mutation endpoint for comments. |
-| POST http://localhost:${MOCK_GITHUB_PORT}/issues/:number/comments  body: { "author"?: string, "body": string } | Appends a comment to issue :number in memory and returns 201 with the created comment { author, body, createdAt }. If "author" is omitted, it defaults to "Anonymous". Responds 404 if the issue doesn't exist yet (progressive load window). |
-| MOCK_GITHUB_PORT (.env) | Port the mock GitHub HTTP server listens on. Same var and default as spec 001. |
-| mock GitHub terminal output | On process start and after every accepted comment mutation, the terminal is fully cleared (no scrollback append) and the entire current issue list is reprinted top to bottom, each entry formatted as: `Issue #<number>: (<commentCount>)` then `Title:`, `Content:`, `Comments:` with each comment rendered as `  - [<author>]` followed by an indented body line, blank line between comments, matching the example block in the spec. |
-| mock GitHub terminal log line on mutation | Immediately before the full repaint triggered by a new comment, one line is written: `New comment on issue #<number> by <author>`. |
-| pnpm issues-tracker | Starts the Proactive Issues Tracker. It polls MOCK_GITHUB_PORT's issue list, and for every issue where none of its existing comments has author "GitHub Issues Tracker", it posts a comment with body "I've been here!" and author "GitHub Issues Tracker" via the mutation endpoint. |
-| ISSUES_TRACKER_POLL_INTERVAL_MS (.env) | Milliseconds between tracker poll cycles. Defaults to 1000 if unset. |
-| specs/001-.../output/accs.bash | Unchanged entry point from spec 001, still exits 0 for a healthy read-only mock and used as a precondition gate by this spec's ACCS. |
+| pnpm mock-github | Starts the In-Memory Stateful Fake GitHub Service: HTTP server plus terminal renderer sharing in-memory state. Loads 60% of mock issues immediately, rest linearly over 10s, per spec 001. |
+| env MOCK_GITHUB_PORT (default 4000) | Port the Mock GitHub HTTP server listens on. |
+| GET /issues | Returns JSON array of issues, each with id, title, content, comments[] (author, body, createdAt), reflecting exact in-memory state at call time. |
+| POST /issues/:id/comments { author, body } | Appends a comment in memory, returns updated issue JSON with status 201, or 404 if id doesn't exist. |
+| stdout marker line: "===SNAPSHOT <n> <isoTimestamp>===" | First line of every repaint, n strictly increasing from 0. Everything until the next marker is one complete screen, no issue repeats within it. |
+| Mock GitHub terminal issue line format: "Issues #<id>: (<commentCount>)" | commentCount always equals comments.length from GET /issues at render time. |
+| Mock GitHub terminal comment-added log line: "[comment] issue #<id> +1 from <author>" | Printed once, immediately on successful POST, before the next scheduled repaint. |
+| Mock GitHub terminal truncation line: "..." | If the full listing can't fit the buffer cap, printing stops and the last line is exactly "...", itself counted toward the cap. |
+| env MOCK_GITHUB_BUFFER_CAP (optional, positive integer) | When set, replaces the entire min(stdout.rows,200)/200-fallback cap with this fixed number of lines per screen, snapshot marker included. Unset: behaves exactly as before — min(process.stdout.rows, 200), or 200 when stdout is not a TTY. |
+| pnpm issues-tracker | Starts the Proactive Issues Tracker. Polls GET /issues; for every issue with no comment authored exactly "GitHub Issues Tracker", POSTs { author: "GitHub Issues Tracker", body: "I've been here!" } exactly once. |
+| env MOCK_GITHUB_URL (default http://localhost:4000) | Base URL the Issues Tracker polls. |
+| env ISSUES_TRACKER_POLL_INTERVAL_MS (default 2000) | Interval between tracker poll cycles. |
 
 ## Open questions
 
-- Poll interval value isn't stated anywhere — recommend keeping the 1000ms default described above rather than blocking on it.
-- Should the mutation endpoint validate/reject empty comment bodies? Recommend yes, reject with 400, since the accs.md scenario never sends an empty body and nothing in the spec asks for that leniency.
+- Should the tracker's poll interval stay configurable via env (2000ms default)? Recommend yes — accs needs deterministic waits.
+- Should GET /issues comment ordering be insertion order (oldest first)? Recommend yes — matches the 2026-09-12 example print.
 
 ## Assumptions taken
 
 Gaps the enricher had to settle without the operator. Each is a flag, not a decision — read them
 and append an entry if any is wrong.
 
-- **What exact HTTP path and method does the comment mutation use?** POST /issues/:number/comments, mirroring the read-side issue-numbering already established by spec 001's endpoints.
-- **Does the tracker start commenting immediately or wait for the mock's progressive load to finish?** Tracker polls on its own cadence starting immediately at launch; it will simply pick up newly-appeared issues in later poll cycles as the mock streams them in, per the Init note that discovery of new issues triggers the comment.
+- **Exact tracker comment author string to check for prior touch** "GitHub Issues Tracker" — matches the example print in 2026-09-12 Mock GitHub Improvements
+- **Default port/poll-interval numbers, not stated in prose** 4000 and 2000ms — arbitrary but stable, both overridable via env
+- **What value accs.bash should set MOCK_GITHUB_BUFFER_CAP to when piping mock-github to a log file** 500 — comfortably above any plausible mock dataset size (fixture is well under 200 issues total including comments lines), high enough that the 'fit in the entire list of entries' duplication checks never hit a truncation-induced false negative, while still low enough that a runaway dataset would still get caught by a separate, unbounded-cap-independent duplicate-id check
 
 ## Done when
 
-- specs/002-early-alpha-issues-reader/output/accs.bash exits 0
-- with mock GitHub and the tracker both running, curl-ing a new comment onto an issue produces an immediate 'New comment on issue #<n> by <author>' log line followed by a full terminal repaint showing the updated comment count and body
+- pnpm mock-github serves GET /issues and accepts POST /issues/:id/comments, mutating in-memory state
+- Mock GitHub terminal output contains a "===SNAPSHOT n ...===" line before every repaint, n strictly increasing
+- Within any single snapshot, every issue id appears at most once and the total line count never exceeds the active cap (default or MOCK_GITHUB_BUFFER_CAP override)
+- pnpm issues-tracker, run once against untouched issues, results in every issue having a "GitHub Issues Tracker" / "I've been here!" comment, without re-touching issues that already have one
 
 ## Behaviour
 
-### Tracker touches every issue exactly once
+### comment count display
 
 | input | expected |
 | ----- | -------- |
-| Mock GitHub starts with issues and zero comments; tracker starts and polls | each issue that exists at poll time gets exactly one "I've been here!" comment from author "GitHub Issues Tracker", never more than one even across further poll cycles |
-| An issue already has a "GitHub Issues Tracker" comment | tracker does not comment on it again |
+| issue with 2 comments in memory | terminal line reads "Issues #<id>: (2)" |
 
-### Manual comment via curl interleaves with tracker comment
-
-| input | expected |
-| ----- | -------- |
-| curl POST { "author": "curl-user", "body": "Hello World!" } to the first issue, tracker running concurrently | first issue ends up with 2 comments: the curl one and the tracker's "I've been here!"; other already-loaded issues end up with 1 comment (just the tracker's); issues not yet streamed in by t=4s legitimately show 0 |
-
-### Full repaint discipline
+### comment-added logging
 
 | input | expected |
 | ----- | -------- |
-| Any comment mutation, from curl or from the tracker | terminal clears and reprints the complete current issue list, not just the changed issue |
+| POST /issues/5/comments {author:'JohnDoe', body:'hi'} | line "[comment] issue #5 +1 from JohnDoe" prints immediately, before next scheduled repaint |
+
+### full repaint on change
+
+| input | expected |
+| ----- | -------- |
+| any mutation (new issue loaded, or comment added) | new "===SNAPSHOT n+1 ...===" line followed by complete current state; no issue from previous screen assumed still visible |
+
+### buffer truncation (default cap)
+
+| input | expected |
+| ----- | -------- |
+| issue listing longer than the active cap, MOCK_GITHUB_BUFFER_CAP unset | printing stops before exceeding min(tty rows,200)/200 and final line is exactly "..." |
+
+### buffer override for full-coverage tests
+
+| input | expected |
+| ----- | -------- |
+| MOCK_GITHUB_BUFFER_CAP=500 set before spawning pnpm mock-github | cap becomes 500 lines regardless of TTY presence, letting a full mock dataset render without truncation |
+
+### proactive commenting
+
+| input | expected |
+| ----- | -------- |
+| issue with zero comments | tracker posts one comment: author "GitHub Issues Tracker", body "I've been here!" |
+| issue already having a "GitHub Issues Tracker" comment | tracker posts nothing further |
+| issue with only non-tracker comments (e.g. JohnDoe) | tracker still posts its one comment, count becomes existing+1 |
 
 ## Decisions already made
 
-- **Comment payload is { author?, body } with author defaulting to "Anonymous" when omitted** — 2026-09-10 Init doesn't specify a curl payload shape; accs.md curls a comment without stating an author, so the endpoint has to tolerate that.
-- **Tracker's own service state (which issues it's touched) is purely in-memory, re-derived from reading each issue's existing comments rather than a private log** — 2026-09-10 Init says 'writes a comment under any issue it hasn't already touched' — the only durable signal available is the comment list itself, and 001/002 both forbid persistence.
-- **Tracker poll interval defaults to 1000ms, configurable via ISSUES_TRACKER_POLL_INTERVAL_MS** — Init and accs.md never state a cadence; accs.md's 4-second check window needs at least a couple of poll cycles to be reliable, so a 1s default was picked over anything slower.
-- **001's accs.bash stays untouched and is treated as a precondition gate: run it, and only tear down the 001 process if it exits 0, then continue into 002's own checks** — accs.md literally instructs this order and failure behavior.
+- **Snapshot boundary is a literal stdout marker line, not ANSI clear codes** — 2026-09-12 Mock GitHub Testing Improvements — needed a way to tell snapshots apart that survives piping/redirection during tests
+- **Tracker identifies 'already touched' purely by comment author string match, no separate touched-log** — 2026-09-11 Init — state stays in the mock service, memory-only anyway
+- **Comment-added log line prints immediately on mutation, decoupled from repaint loop** — 2026-09-11 Init — logging requirement is distinct from full repaint requirement
+- **No-TTY fallback is a hard 200 by default, never less** — 2026-09-12 GitHub Cli Revamp — explicit fallback rule
+- **Added MOCK_GITHUB_BUFFER_CAP override, replacing the default cap entirely when set, read identically by the renderer and by any ACCS snapshot parser** — prior verification rejected this spec — accs.bash piped mock-github to a log file (never a TTY), so the 200-line fallback always applied with no way to raise it for a larger dataset, and the ACCS's own BUFFER_CAP check wasn't wired to the same source of truth. One shared env var fixes both.
 
 ## Out of scope
 
-- editing or deleting existing comments
-- authenticating or rate-limiting the mutation endpoint
-- persisting tracker touch-state or mock GitHub state to disk
-- real GitHub API integration (that's Beta per the assessment roadmap)
+- comment editing/deletion endpoints
+- multi-tracker coordination locks
+- persisting state to disk
+- rate limiting or auth on the mutation endpoint
