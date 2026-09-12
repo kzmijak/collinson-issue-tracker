@@ -1,0 +1,97 @@
+{
+  "at": "2026-09-12T11:22:10.774Z",
+  "durationMs": 37693,
+  "entry": "2026-09-12 — GitHub Service Port — accs correction",
+  "sourceSha": "304755a1ba25",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 25,
+    "outputTokens": 5052,
+    "cacheReadTokens": 19430,
+    "cacheCreationTokens": 0
+  },
+  "effectiveTokens": 54456,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "fixedFrom": "rejected",
+  "verification": {
+    "at": "2026-09-12T11:22:40.612Z",
+    "verdict": "approved",
+    "summary": "The blocking awk bug is fixed: check_snapshots() now has a BEGIN block setting lastN=-1, so the first marker (n=0) no longer false-fails as nonmonotonic. The stale port-4000 assertion is also gone, PORT now defaults to 4123 matching the contract.",
+    "mustFix": [],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "if (n<=lastN) { print \"FAIL nonmonotonic \" n \" after \" lastN; bad=1; exit }",
+        "problem": "Correct now, but there's no test guarding against this exact regression class (uninitialized awk state) recurring silently in future edits — a one-line synthetic self-check before the real run would catch it early instead of relying on manual review."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Coverage",
+        "quote": "BEGIN { lastN = -1 }",
+        "problem": "This single init line was the entire root cause from the last rejection and is now confirmed present; no other logic in check_snapshots() changed, so the rest of the previously-working dup/cap/truncation checks are unaffected."
+      }
+    ],
+    "fix": "full",
+    "effectiveTokens": 64561.1,
+    "specSha": "a184218dcde0"
+  },
+  "application": {
+    "at": "2026-09-12T11:30:50.635Z",
+    "status": "converged",
+    "rounds": 1,
+    "checkExitCode": 0,
+    "checkDurationMs": 22304,
+    "converged": true,
+    "summary": "Most of spec 002 was already implemented; I found and fixed two real implementation bugs that were making the ACCS fail (a stray ANSI escape line corrupting snapshot parsing, and a blank MOCK_GITHUB_URL silently zeroing out the tracker's poll target). `bash specs/002-early-alpha-issues-reader/output/accs.bash` now exits 0, run twice back to back, with `pnpm test`/`lint`/`typecheck` all clean.",
+    "files": [
+      "src/mock-github/terminal.ts",
+      "src/issue-tracker/proactiveConfig.ts",
+      "tests/mock-github/terminal.test.ts",
+      "tests/issue-tracker/proactiveConfig.test.ts"
+    ],
+    "picks": [
+      {
+        "decision": "how to stop the ANSI clear code corrupting piped snapshot parsing",
+        "chose": "only emit \\x1B[2J\\x1B[H when process.stdout.isTTY is true",
+        "why": "the escape line has no business in a redirected/captured log and the contract's marker-line format has no room for it either"
+      },
+      {
+        "decision": "how to print stdout content while satisfying no-console-log lint rule",
+        "chose": "added a writeLine() helper using process.stdout.write directly instead of console.log",
+        "why": "repo eslint only allows console.warn/error, and the contract requires these lines on stdout not stderr"
+      }
+    ],
+    "findings": [
+      {
+        "area": "Coverage",
+        "quote": null,
+        "problem": "accs.bash's check_snapshots awk parser attributes any unrecognized line between two ===SNAPSHOT markers to the earlier snapshot rather than treating it as noise. It works correctly now that the implementation emits nothing extraneous between markers, but it's a sharp edge if a future change ever needs another stdout log line outside of a repaint."
+      }
+    ],
+    "fix": "none",
+    "blocked": null,
+    "effectiveTokens": 1183876.2000000002,
+    "effectiveTokenBudget": 1200000,
+    "withinBudget": true,
+    "usage": {
+      "inputTokens": 1225,
+      "outputTokens": 28763,
+      "cacheReadTokens": 3487306,
+      "cacheCreationTokens": 78534
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "a184218dcde0"
+  },
+  "commits": [
+    {
+      "at": "2026-09-12T13:17:15.160Z",
+      "sha": "6dbe468",
+      "subject": "chore(reader): regenerate ACCS script and enriched spec for repaint/port changes"
+    }
+  ]
+}
