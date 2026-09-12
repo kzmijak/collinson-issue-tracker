@@ -71,6 +71,11 @@
       "at": "2026-09-12T08:16:35.742Z",
       "sha": "22c2dfa",
       "subject": "spec(reader): amend 002 with mock GitHub testing improvements"
+    },
+    {
+      "at": "2026-09-12T08:16:35.857Z",
+      "sha": "98beba0",
+      "subject": "chore(metrics): record the mock GitHub improvements apply run"
     }
   ],
   "application": {
