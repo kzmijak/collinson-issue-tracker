@@ -46,5 +46,66 @@
       "sha": "b0002ba",
       "subject": "spec(reader): add 002-early-alpha-issues-reader specification"
     }
-  ]
+  ],
+  "application": {
+    "at": "2026-09-11T18:42:03.758Z",
+    "status": "converged",
+    "rounds": 1,
+    "checkExitCode": 0,
+    "checkDurationMs": 19341,
+    "converged": true,
+    "summary": "Added the mutation endpoint (GET/POST /issues, /issues/:number/comments) and a repainting GitHub Service Terminal to the mock GitHub service, plus a new Proactive Issues Tracker that mock-mode-gates itself and drops a one-time 'I've been here!' comment per undiscovered issue. specs/002-early-alpha-issues-reader/output/accs.bash passes on repeated runs, and pnpm typecheck/lint/format:check/test all pass.",
+    "files": [
+      ".env.example",
+      "package.json",
+      "src/mock-github/main.ts",
+      "src/mock-github/server.ts",
+      "src/mock-github/commentsStore.ts",
+      "src/mock-github/terminal.ts",
+      "src/issue-tracker/mockGithubClient.ts",
+      "src/issue-tracker/proactiveConfig.ts",
+      "src/issue-tracker/proactiveMain.ts",
+      "src/issue-tracker/proactivePoller.ts",
+      "tests/mock-github/commentsStore.test.ts",
+      "tests/issue-tracker/proactiveConfig.test.ts",
+      "tests/issue-tracker/proactivePoller.test.ts"
+    ],
+    "picks": [
+      {
+        "decision": "cadence of the GitHub Service Terminal's repaint loop",
+        "chose": "fixed 1000ms interval, independent of ISSUE_TRACKER_POLL_MS",
+        "why": "the contract only says every poll tick and every accepted comment trigger a repaint, and the mock service has no 'poll' of its own — a steady 1s tick is the simplest thing that gives the ACCS multiple repaint blocks inside its 4s window"
+      },
+      {
+        "decision": "how to make repaint cycles distinguishable in the log",
+        "chose": "print a timestamped header line before each block of Issue #n lines",
+        "why": "without a non-matching separator, back-to-back full repaints of the same issue list are indistinguishable from one continuous list when read back later"
+      },
+      {
+        "decision": "what happens to an issue whose marker-comment POST fails",
+        "chose": "un-touch it so the next poll retries, rather than giving up permanently",
+        "why": "no persistence exists anywhere in this spec, so silently abandoning an issue forever on one transient failure seemed worse than a bounded retry loop"
+      }
+    ],
+    "findings": [
+      {
+        "area": "Scope",
+        "quote": "default mock port - 4001",
+        "problem": "Applying this as the code default would change what port `pnpm mock-github` binds to when MOCK_GITHUB_PORT is unset, which breaks spec 001's accs.bash (it never sets MOCK_GITHUB_PORT itself and hardcodes port 4123) — and spec 002's own ACCS runs spec 001's ACCS first as a gate. I left the code default at 4123 so both ACCS suites keep passing; spec 002's own runs are unaffected since its accs.bash always sets MOCK_GITHUB_PORT explicitly."
+      }
+    ],
+    "fix": "none",
+    "blocked": null,
+    "effectiveTokens": 1264498.9,
+    "effectiveTokenBudget": 1200000,
+    "withinBudget": false,
+    "usage": {
+      "inputTokens": 1275,
+      "outputTokens": 32021,
+      "cacheReadTokens": 3718407,
+      "cacheCreationTokens": 79223
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "1dbfb3e4bea1"
+  }
 }
