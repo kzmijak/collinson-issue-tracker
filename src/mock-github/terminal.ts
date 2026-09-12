@@ -18,6 +18,11 @@ function resolveBufferCap(): number {
   return DEFAULT_FALLBACK_CAP;
 }
 
+/** Writes straight to stdout — the marker/log lines this module prints must never land on stderr. */
+function writeLine(line: string): void {
+  process.stdout.write(`${line}\n`);
+}
+
 function countNonBlank(lines: readonly string[]): number {
   return lines.filter((line) => line.trim() !== '').length;
 }
@@ -47,8 +52,8 @@ export function repaint(dataset: GrowingIssueDataset, comments: CommentsStore): 
   snapshotCounter += 1;
   const cap = resolveBufferCap();
 
-  process.stdout.write('\x1B[2J\x1B[H\n');
-  console.warn(`===SNAPSHOT ${n} ${new Date().toISOString()}===`);
+  if (process.stdout.isTTY) process.stdout.write('\x1B[2J\x1B[H\n');
+  writeLine(`===SNAPSHOT ${n} ${new Date().toISOString()}===`);
 
   const blocks = dataset
     .getVisibleIssues()
@@ -57,7 +62,7 @@ export function repaint(dataset: GrowingIssueDataset, comments: CommentsStore): 
 
   if (totalNonBlank <= cap) {
     for (const block of blocks) {
-      for (const line of block) console.warn(line);
+      for (const line of block) writeLine(line);
     }
     return;
   }
@@ -66,12 +71,12 @@ export function repaint(dataset: GrowingIssueDataset, comments: CommentsStore): 
   for (const block of blocks) {
     const blockNonBlank = countNonBlank(block);
     if (nonBlankUsed + blockNonBlank > cap - 1) break;
-    for (const line of block) console.warn(line);
+    for (const line of block) writeLine(line);
     nonBlankUsed += blockNonBlank;
   }
-  console.warn('...');
+  writeLine('...');
 }
 
 export function logNewComment(issueNumber: number, author: string): void {
-  console.warn(`[comment] issue #${issueNumber} +1 from ${author}`);
+  writeLine(`[comment] issue #${issueNumber} +1 from ${author}`);
 }

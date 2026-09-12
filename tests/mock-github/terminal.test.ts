@@ -12,20 +12,19 @@ describe('repaint', () => {
       writes.push(String(chunk));
       return true;
     });
-    vi.spyOn(console, 'warn').mockImplementation((line: unknown) => {
-      writes.push(`${String(line)}\n`);
-    });
   });
 
   afterEach(() => {
     delete process.env.MOCK_GITHUB_BUFFER_CAP;
+    delete (process.stdout as { isTTY?: boolean }).isTTY;
   });
 
   function output(): string {
     return writes.join('');
   }
 
-  it('prefixes every repaint with the ANSI clear code followed by its own snapshot marker', () => {
+  it('prefixes every repaint with the ANSI clear code when attached to a real TTY', () => {
+    (process.stdout as { isTTY?: boolean }).isTTY = true;
     const dataset = new GrowingIssueDataset();
     const comments = new CommentsStore();
 
@@ -38,6 +37,20 @@ describe('repaint', () => {
 
     const firstClearIndex = output().indexOf('\x1B[2J\x1B[H');
     expect(firstClearIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it('skips the ANSI clear code when not attached to a TTY, so a piped/captured log stays clean', () => {
+    (process.stdout as { isTTY?: boolean }).isTTY = false;
+    const dataset = new GrowingIssueDataset();
+    const comments = new CommentsStore();
+
+    repaint(dataset, comments);
+    repaint(dataset, comments);
+
+    expect(output().includes('\x1B[2J\x1B[H')).toBe(false);
+    const lines = output().split('\n');
+    const snapshotLines = lines.filter((line) => /^===SNAPSHOT \d+ .+===$/.test(line));
+    expect(snapshotLines.length).toBe(2);
   });
 
   it('numbers snapshots strictly increasing, never repeating', () => {
@@ -102,10 +115,10 @@ describe('repaint', () => {
 
 describe('logNewComment', () => {
   it('writes the mutation log line with issue id and author', () => {
-    const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     logNewComment(3, 'curl-user');
 
-    expect(log).toHaveBeenCalledWith('[comment] issue #3 +1 from curl-user');
+    expect(write).toHaveBeenCalledWith('[comment] issue #3 +1 from curl-user\n');
   });
 });
