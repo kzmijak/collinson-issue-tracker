@@ -56,6 +56,16 @@
       "at": "2026-09-12T07:45:35.317Z",
       "sha": "596abeb",
       "subject": "spec(reader): amend 002 with mock GitHub console repaint format"
+    },
+    {
+      "at": "2026-09-12T07:45:35.341Z",
+      "sha": "c2d924e",
+      "subject": "spec(reader): re-enrich 002 for the mock GitHub improvements amendment"
+    },
+    {
+      "at": "2026-09-12T07:45:35.374Z",
+      "sha": "ab0d026",
+      "subject": "feat(reader): implement proactive issues tracker and mock comment endpoint"
     }
   ]
 }
