@@ -1,0 +1,101 @@
+{
+  "at": "2026-09-12T10:14:32.777Z",
+  "durationMs": 88705,
+  "entry": "2026-09-12 — GitHub Service Port",
+  "sourceSha": "5eb6024bc0cc",
+  "model": "claude-sonnet-5",
+  "taskBudgetTokens": 45000,
+  "usage": {
+    "inputTokens": 75,
+    "outputTokens": 9937,
+    "cacheReadTokens": 18486,
+    "cacheCreationTokens": 28202
+  },
+  "effectiveTokens": 173722.2,
+  "outcome": "written",
+  "files": [
+    "specs/002-early-alpha-issues-reader/output/accs.bash"
+  ],
+  "pruned": [],
+  "counts": {
+    "blocking": 0,
+    "openQuestions": 2,
+    "assumptions": 3,
+    "decisions": 7,
+    "behaviours": 7,
+    "cases": 9,
+    "doneWhen": 5,
+    "outOfScope": 4,
+    "files": 1
+  },
+  "verification": {
+    "at": "2026-09-12T10:15:21.529Z",
+    "verdict": "approved",
+    "summary": "The only previous mustFix — exporting MOCK_GITHUB_PORT=4000 before invoking spec 001's frozen accs.bash — is gone; both scripts now share the unexported 4123 default and every remaining step lines up with accs.md and the contract.",
+    "mustFix": [],
+    "shouldFix": [
+      {
+        "area": "Method",
+        "quote": "] ' \"$LOG\" | csplit -s -z -f \"$OUT/blk\" - \"/^$/\" 2>/dev/null || true",
+        "problem": "This whole first half of check_no_dupes builds a block string and pipes it into csplit whose output is never read, discarding files under $OUT/blk* on disk for no purpose. It's dead code that only adds noise and stray files, the real duplicate check is the awk block right after it."
+      },
+      {
+        "area": "Method",
+        "quote": "pkill -f \"pnpm mock-github\" 2>/dev/null; sleep 1",
+        "problem": "pkill matches by command line, but pnpm spawns a child process (e.g. node dist/index.js) whose argv likely won't contain the literal string 'pnpm mock-github', so this may silently fail to free the port if spec 001's own cleanup trap didn't already do it. Low risk since spec 001's accs.bash should have its own trap-based cleanup, but worth tightening if step 2 ever flakes on 'address in use'."
+      }
+    ],
+    "shouldKnow": [
+      {
+        "area": "Method",
+        "quote": "match($0,/Issues #([0-9]+):/,m) {",
+        "problem": "The three-arg form of match() capturing into an array is a gawk extension, not POSIX awk. Fine on any normal Linux dev/CI box with gawk as /usr/bin/awk, but would silently misbehave on a system where awk is mawk or BSD awk."
+      },
+      {
+        "area": "Coverage",
+        "quote": "-d '{\"author\":\"tester\",\"body\":\"Hello World!\"}'",
+        "problem": "accs.md only specifies the comment body 'Hello World!', not the author; the script picks 'tester' as an unstated default. Reasonable and doesn't affect any check, just wasn't captured in the enriched spec's 'Assumptions taken' list."
+      }
+    ],
+    "fix": "accs",
+    "effectiveTokens": 85699.7,
+    "specSha": "5621aeade95b"
+  },
+  "application": {
+    "at": "2026-09-12T10:23:52.769Z",
+    "status": "budget-exhausted",
+    "rounds": 1,
+    "checkExitCode": 1,
+    "checkDurationMs": 4103,
+    "converged": false,
+    "summary": null,
+    "files": [],
+    "picks": [],
+    "findings": [],
+    "fix": "none",
+    "blocked": null,
+    "effectiveTokens": 1508929.5000000005,
+    "effectiveTokenBudget": 1200000,
+    "withinBudget": false,
+    "usage": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheCreationTokens": 0
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "5621aeade95b"
+  },
+  "commits": [
+    {
+      "at": "2026-09-12T10:34:02.462Z",
+      "sha": "7cbc350",
+      "subject": "spec(reader): revise 002 to pin the mock GitHub port and drop the 001 preflight"
+    },
+    {
+      "at": "2026-09-12T10:34:02.545Z",
+      "sha": "a650726",
+      "subject": "chore(reader): regenerate the ACCS script and enriched spec for the port/shape changes"
+    }
+  ]
+}

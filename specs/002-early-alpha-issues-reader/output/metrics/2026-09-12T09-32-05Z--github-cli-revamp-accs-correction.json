@@ -18,25 +18,21 @@
   ],
   "fixedFrom": "rejected",
   "verification": {
-    "at": "2026-09-12T09:32:53.142Z",
-    "verdict": "approved",
-    "summary": "Both prior blockers are now fixed — the coverage check confirms every pre-tracker issue actually got touched, and the cap/truncation rules are enforced (not just computed) via scan_snapshots' exit codes feeding assert_no_dupes.",
-    "mustFix": [],
-    "shouldFix": [],
-    "shouldKnow": [
+    "at": "2026-09-12T09:48:05.063Z",
+    "verdict": "rejected",
+    "summary": "Finished bringing mock-github and the issues tracker in line with spec 002's latest enriched contract (flat /issues shape with id/content, snapshot-marker terminal repaint, buffer-cap truncation, updated port/interval defaults) and fixed two pre-existing test bugs so the full suite (220 tests) and tsc are clean. I could not get output/accs.bash to exit 0: step 1 unconditionally fails because the script exports MOCK_GITHUB_PORT=4000 before invoking spec 001's frozen accs.bash, whose own probe uses an unrelated 4123 default — I verified by hand that every other step (2 through 8) passes once that ordering bug is bypassed.",
+    "mustFix": [
       {
         "area": "Method",
-        "quote": "unset GITHUB_TOKEN GH_TOKEN",
-        "problem": "Mock-only enforcement relies on absence of these two env vars rather than asserting the actual command invoked is the mock service. Acceptable given the script only ever calls `pnpm mock-github` / `pnpm issues-tracker`, but it's a soft guarantee, not a hard one."
-      },
-      {
-        "area": "Coverage",
-        "quote": "sleep \"$(( (ISSUES_TRACKER_POLL_INTERVAL_MS/1000) * 3 + 2 ))\"",
-        "problem": "With default settings this gives the tracker ~8s combined with earlier waits, which lands after the 10s mock-load window in most runs but isn't strictly guaranteed if step 4/5 finish faster than expected. Worth padding if this ever flakes."
+        "quote": "export MOCK_GITHUB_PORT=\"$MOCK_PORT\"",
+        "problem": "This runs before step 1 invokes spec 001's own frozen accs.bash, so the mock-github process that script spawns inherits MOCK_GITHUB_PORT=4000 while that script's own curl probe still targets its independently-computed default of 4123 (it has no knowledge of MOCK_GITHUB_PORT). The two scripts can never agree on a port in this order, so the smoke test fails every single time regardless of what src/ contains, blocking every later check in the file."
       }
     ],
+    "shouldFix": [],
+    "shouldKnow": [],
     "fix": "accs",
-    "effectiveTokens": 72631.6,
+    "by": "implementer",
+    "effectiveTokens": 0,
     "specSha": "111d99fc2458"
   },
   "commits": [
@@ -60,5 +56,47 @@
       "sha": "1511a5c",
       "subject": "chore(metrics): record the GitHub CLI revamp and testing-improvement runs"
     }
-  ]
+  ],
+  "application": {
+    "at": "2026-09-12T09:48:05.063Z",
+    "status": "blocked",
+    "rounds": 1,
+    "checkExitCode": 1,
+    "checkDurationMs": 4233,
+    "converged": false,
+    "summary": "Finished bringing mock-github and the issues tracker in line with spec 002's latest enriched contract (flat /issues shape with id/content, snapshot-marker terminal repaint, buffer-cap truncation, updated port/interval defaults) and fixed two pre-existing test bugs so the full suite (220 tests) and tsc are clean. I could not get output/accs.bash to exit 0: step 1 unconditionally fails because the script exports MOCK_GITHUB_PORT=4000 before invoking spec 001's frozen accs.bash, whose own probe uses an unrelated 4123 default — I verified by hand that every other step (2 through 8) passes once that ordering bug is bypassed.",
+    "files": [
+      ".env.example",
+      "src/issue-tracker/mockGithubClient.ts",
+      "src/issue-tracker/proactiveConfig.ts",
+      "src/issue-tracker/proactivePoller.ts",
+      "src/mock-github/main.ts",
+      "src/mock-github/server.ts",
+      "src/mock-github/terminal.ts",
+      "tests/issue-tracker/proactiveConfig.test.ts",
+      "tests/issue-tracker/proactivePoller.test.ts",
+      "tests/mock-github/terminal.test.ts"
+    ],
+    "picks": [],
+    "findings": [
+      {
+        "area": "Method",
+        "quote": "export MOCK_GITHUB_PORT=\"$MOCK_PORT\"",
+        "problem": "This runs before step 1 invokes spec 001's own frozen accs.bash, so the mock-github process that script spawns inherits MOCK_GITHUB_PORT=4000 while that script's own curl probe still targets its independently-computed default of 4123 (it has no knowledge of MOCK_GITHUB_PORT). The two scripts can never agree on a port in this order, so the smoke test fails every single time regardless of what src/ contains, blocking every later check in the file."
+      }
+    ],
+    "fix": "accs",
+    "blocked": "specs/002's accs.bash exports MOCK_GITHUB_PORT=4000 globally before running spec 001's accs.bash, which probes its own hardcoded default port 4123 — the ports can never converge in this call order, so the ACCS cannot reach exit 0 no matter what the implementation does.",
+    "effectiveTokens": 926197.8,
+    "effectiveTokenBudget": 1200000,
+    "withinBudget": true,
+    "usage": {
+      "inputTokens": 850,
+      "outputTokens": 22618,
+      "cacheReadTokens": 2135589,
+      "cacheCreationTokens": 108480
+    },
+    "model": "claude-sonnet-5",
+    "specSha": "111d99fc2458"
+  }
 }
