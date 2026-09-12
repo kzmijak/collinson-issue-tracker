@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { processIds, sweepStrays } from './strays.js';
 
 export interface CheckResult {
   exitCode: number;
@@ -14,24 +13,10 @@ export interface CheckResult {
  * exiting is not the same as its children being gone. Sweeping the group either way is what stops
  * one idle survivor accumulating per run.
  */
-export async function runCheck(
+export function runCheck(
   script: string,
   timeoutMs: number,
   env: NodeJS.ProcessEnv = process.env,
-): Promise<CheckResult> {
-  // A check that starts a server with `setsid` puts it in a group of its own, outside the one swept
-  // below — so what the check leaves running is also collected, by comparison against this.
-  const before = await processIds();
-  const result = await spawnCheck(script, timeoutMs, env);
-  await sweepStrays(before, process.cwd());
-
-  return result;
-}
-
-function spawnCheck(
-  script: string,
-  timeoutMs: number,
-  env: NodeJS.ProcessEnv,
 ): Promise<CheckResult> {
   return new Promise((resolve) => {
     const startedAt = Date.now();

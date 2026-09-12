@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,21 +45,5 @@ describe('excerpt', () => {
     expect(result).toContain('FAIL: broken');
     expect(result).toContain('last line');
     expect(result).toContain('characters omitted');
-  });
-
-  it('collects what the check left running, even in a process group of its own', async () => {
-    // A duration nothing else would use, so the search cannot match another run's leftovers.
-    const marker = `60.${process.pid}`;
-    await runCheck(script(`setsid sleep ${marker} >/dev/null 2>&1 & exit 1`), 5_000);
-
-    const alive = () => {
-      try {
-        return execFileSync('pgrep', ['-f', `sleep ${marker}`], { encoding: 'utf8' }).trim();
-      } catch {
-        return '';
-      }
-    };
-
-    expect(alive()).toBe('');
   });
 });
