@@ -116,6 +116,11 @@
       "at": "2026-09-12T14:14:12.423Z",
       "sha": "e7999e1",
       "subject": "spec(triage): specify kind and needsHuman triage fields"
+    },
+    {
+      "at": "2026-09-12T14:14:12.513Z",
+      "sha": "cc01bff",
+      "subject": "chore(metrics): record spec 005 triage-fields run metrics"
     }
   ]
 }
